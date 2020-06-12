@@ -1,0 +1,19 @@
+.ui-button.ui-button--pending,
+.ui-button--pending .ui-button.ui-button--pending-text {
+	background-color: #ca5e5e;
+}
+.ui-button--pending .ui-button,
+.ui-button--processed .ui-button {
+	padding: 0;
+}
+.order-details {
+	list-style: none;
+	padding: 0;
+}
+.order-details__sku {
+	font-weight: bold;
+}
+.order-details__title {
+	/*color: #777676;*/
+	/*font-style: italic;*/
+}
