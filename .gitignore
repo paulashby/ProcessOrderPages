@@ -1,0 +1,15 @@
+/wire/*
+composer.json
+CONTRIBUTING.md
+index.php
+LICENSE.TXT
+.DS_Store
+.htaccess
+htaccess.txt
+/site/assets/*
+/site/modules/README.txt
+/site/modules/TracyDebugger/*
+/site/modules/FieldtypeTextUnique/*
+/site/modules/Helloworld/*
+/site/modules/InputfieldCKEditor/*
+/site/modules/ProcessOrderPages/Notes.txt
