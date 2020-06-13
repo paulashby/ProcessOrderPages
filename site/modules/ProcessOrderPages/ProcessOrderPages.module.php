@@ -283,6 +283,7 @@ class ProcessOrderPages extends Process {
 
     } else {  
 
+      //TODO: It's not cool naming this with quantity since it can change!
       // Add a new order
       $item_title = $sku . ' x ' . $quantity . ' for ' . $user_display_name;
       $item_data = array(
@@ -299,6 +300,48 @@ class ProcessOrderPages extends Process {
       $cart_item = $this->wire('pages')->add($template, '/processwire/orders/' . $pre . 'cart-items', $item_data);
     }
     return json_encode(Array("success"=>true));
+  }
+  /**
+ * Change quantity of cart item
+ *
+ * @param    string  $sku The item to update
+ * @param    string  $qty The new value
+ * @return   Json
+ *
+  *
+ */
+  public function changeQuantity($sku, $qty) {
+
+    $pre = $this->settings['pre'];
+    $skus = $this->sanitizer->text($sku);
+    $qtys = $this->sanitizer->text($qty);
+
+    $user_id = $this->users->getCurrentUser()->id;
+    $template_name = $pre . 'line-item';
+    $customer_field_name = $pre . 'customer';
+    $sku_field_name = $pre . 'sku_ref';
+
+    $selector = 'template=' . $template_name . ', ' . $customer_field_name . '=' .  $user_id . ', ' . $sku_field_name . '=' . $skus;
+    $cart_item = $this->pages->findOne($selector);
+
+    if($cart_item->id) {
+        $cart_item->of(false);
+        $cart_item->set($pre . 'quantity', (int)$qtys);
+        $cart_item->save();
+        return json_encode(array('success'=>true));  
+    }
+    return json_encode(array('error'=>'The item could not be found'));
+  }
+
+ /**
+ * Get prefix string
+ *
+ * @return   string Prefix
+ *
+  *
+ */
+  public function getPrefix() {
+    return $this->settings['pre'];
   }
 
   /**
