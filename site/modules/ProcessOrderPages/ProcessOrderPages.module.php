@@ -26,13 +26,13 @@ class ProcessOrderPages extends Process {
   );
   protected $line_item_fields = array(
     'customer'      =>  array('fieldtype'=>'FieldtypeText', 'label'=>'Customer'),
-    'sku'           =>  array('fieldtype'=>'FieldtypeTextUnique', 'label'=>'SKU - Unique product identifier'),
-    'order_status'  =>  array('fieldtype'=>'FieldtypeText', 'label'=>'Status'),
+    'sku_ref'       =>  array('fieldtype'=>'FieldtypeText', 'label'=>'Record of cart item sku'),
     'quantity'      =>  array('fieldtype'=>'FieldtypeInteger', 'label'=>'Number of packs'),
     'total'         =>  array('fieldtype'=>'FieldtypeInteger', 'label'=>'Line item total')
   );
   protected $step_pages = array(
     'cart-items'        =>  array('title'=>'Cart Items', 'template'=>'cart-item'),
+    'pending-orders'     =>  array('title'=>'Pending Orders', 'template'=>'step'),
     'active-orders'     =>  array('title'=>'Active Orders', 'template'=>'step'),
     'completed-orders'  =>  array('title'=>'Completed Orders', 'template'=>'step')
   );
@@ -64,27 +64,31 @@ class ProcessOrderPages extends Process {
 
     parent::___install();
 
+    $pre = $this->settings['pre'];
+
     // Initalised here as it must be possible to evaluate class member properties at compile time
-    $this->settings['line_item_template_name'] = $this->validateName($this->settings['pre'] . 'line-item', 'templates');
-    $this->settings['order_template_name'] = $this->validateName($this->settings['pre'] . 'order', 'templates'); 
+    $this->settings['line_item_template_name'] = $this->validateName($pre . 'line-item', 'templates');
+    $this->settings['order_template_name'] = $this->validateName($pre . 'order', 'templates'); 
     
     $this->step_templates_setup['cart-item'] = $this->settings['line_item_template_name'];
     $this->step_templates_setup['order'] = $this->settings['line_item_template_name'];
     $this->step_templates_setup['step'] = $this->settings['order_template_name'];
 
+    // Make text field for unique sku on product page - we leave this in place when uninstalling to avoid problems with product listings, 
+    // so check it doesn't exist before adding in case we're reinstalling
+    $sku_exists = $this->fields->get($pre . 'sku');
+    if( ! $sku_exists) {
+      $unique_sku = $this->makeField('sku', array('fieldtype'=>'FieldtypeTextUnique', 'label'=>'SKU - Unique product identifier'));
+    }
+
     // Make template for line item pages
     $fg = new Fieldgroup();
-    
-    $fgname = $this->validateName($this->settings['pre'] . 'line-item', 'fieldgroups');
+    $fgname = $this->validateName($pre . 'line-item', 'fieldgroups');
     $fg->name = $fgname;
     $fg->add($this->fields->get('title'));
 
     foreach ($this->line_item_fields as $fieldname => $options) {
-      $f = new Field();
-      $f->type = $this->modules->get($options['fieldtype']);
-      $f->name = $this->validateName($this->settings['pre'] . $fieldname, 'fields');
-      $f->label = $options['label'];
-      $f->save();
+      $f = $this->makeField($fieldname, $options);
       $fg->add($f);
     }
 
@@ -102,19 +106,23 @@ class ProcessOrderPages extends Process {
 
     // Make pages for order steps - these are parent pages for cart items, active orders and completed orders
     foreach ($this->step_pages as $raw_name => $setup) { 
-      $pg_name = $this->validateName($this->settings['pre'] . $raw_name, 'pages');
+      $pg_name = $this->validateName($pre . $raw_name, 'pages');
       $this->makePage($this->step_templates[$setup['template']], '/processwire/orders/', $pg_name, $setup['title']);
     } 
   }
   public function ___uninstall() {
 
-    $this->removeTemplate($this->settings['pre'] . 'line-item', $this->line_item_fields);
+    $pre = $this->settings['pre'];
+
+    // Going to leave sku field as this will have been used on product pages
+
+    $this->removeTemplate($pre . 'line-item', $this->line_item_fields);
 
     // Safe to remove the following as all line-items will have been removed
 
     // Remove order step pages (Cart Items, Active Orders, Completed Orders)
     foreach ($this->step_pages as $pg => $value) {
-      $pg_selector = 'name='. $this->settings['pre'] . $pg; 
+      $pg_selector = 'name='. $pre . $pg; 
       
       if(wire('pages')->count($pg_selector)){
         wire('pages')->get($pg_selector)->delete(true); 
@@ -122,9 +130,9 @@ class ProcessOrderPages extends Process {
     }
 
     // Remove templates
-    $this->removeTemplate($this->settings['pre'] . 'cart-item');
-    $this->removeTemplate($this->settings['pre'] . 'step');
-    $this->removeTemplate($this->settings['pre'] . 'order');
+    $this->removeTemplate($pre . 'cart-item');
+    $this->removeTemplate($pre . 'step');
+    $this->removeTemplate($pre . 'order');
 
     // Remove admin Order page - now that its child pages have been removed
     parent::___uninstall();
@@ -170,6 +178,7 @@ class ProcessOrderPages extends Process {
     // $p->customer_test = $this->user;
     // $p->save();
     //////
+
     $out = "";
 
     $out .= $feedback;
@@ -179,6 +188,13 @@ class ProcessOrderPages extends Process {
     $form = $this->modules->get('InputfieldForm');
     $form->action = "./";
     $form->method = "post";
+
+    // This attribute sets state of button - value is either 'processed-form' or 'completed-form'
+    /*
+      "id+name" attribute sets state of button
+
+      Orders 
+    */
     $form->attr("id+name",'processed-form');
 
     $field = $this->modules->get("InputfieldHidden");
@@ -228,6 +244,62 @@ class ProcessOrderPages extends Process {
 
     return $out;
   }
+ /**
+ * Add product to cart
+ *
+ * @param    WireInputData  $item Form data
+ * @return   Json
+ *
+  *
+ */
+  public function addToCart($item) {
+
+    $pre = $this->settings['pre'];
+
+    $sku =  $this->sanitizer->text($item->sku);
+    $quantity = $this->sanitizer->int($item->quantity);
+    $price = $this->sanitizer->int($item->price);
+    $pre = $pre;
+
+    // Is there an existing order for this product?
+    $template = $pre . 'line-item';
+    $customer_field = $pre . 'customer';
+    $sku_field = $pre . 'sku_ref';
+    $user_id = $this->users->getCurrentUser()->id;
+    $user_display_name = $this->users->get($user_id);
+    $exists_in_cart = $this->pages->findOne('template=' . $template . ', ' . $customer_field . '=' . $user_id . ', ' . $sku_field . '=' . $sku);
+
+    if($exists_in_cart->id) {
+      
+      // Add to existing order
+      $sum = $quantity + $exists_in_cart[$pre . 'quantity'];
+      $total = $price + $exists_in_cart[$pre . 'total'];
+      $item_title = $sku . ' x ' . $sum . ' for ' . $user_display_name;
+      $exists_in_cart->of(false);
+      $exists_in_cart->set('title', $item_title);
+      $exists_in_cart->set($pre . 'quantity', $sum);
+      $exists_in_cart->set($pre . 'total', $total);
+      $exists_in_cart->save();
+
+    } else {  
+
+      // Add a new order
+      $item_title = $sku . ' x ' . $quantity . ' for ' . $user_display_name;
+      $item_data = array(
+        'title' => $item_title,
+        'price' => $price
+      );
+      $item_data[$pre . 'customer'] = $user_id;
+      $item_data[$pre . 'sku_ref'] = $sku;
+      $item_data[$pre . 'quantity'] = $quantity;
+      $item_data[$pre . 'total'] = $price;
+
+      bd($item_data);
+
+      $cart_item = $this->wire('pages')->add($template, '/processwire/orders/' . $pre . 'cart-items', $item_data);
+    }
+    return json_encode(Array("success"=>true));
+  }
 
   /**
  * Check whether field name exists
@@ -239,7 +311,6 @@ class ProcessOrderPages extends Process {
  * @throws   WireException if $existing already has element named with the provided key.
   *
  */
-
   protected function validateName($key, $existing) {
 
     $selector = 'name=' . $key;
@@ -313,13 +384,15 @@ class ProcessOrderPages extends Process {
  */
   protected function makeSimpleTemplate($key, $child_tmpl, $full_name = null) {
 
+    $pre = $this->settings['pre'];
+
     $fg = new Fieldgroup();
-    $fg->name = $this->validateName($this->settings['pre'] . $key, 'fieldgroups');
+    $fg->name = $this->validateName($pre . $key, 'fieldgroups');
     $fg->add($this->fields->get('title'));
     $fg->save();
     $t = new Template();
     if(is_null($full_name)) {
-      $t->name = $this->validateName($this->settings['pre'] . $key, 'templates'); 
+      $t->name = $this->validateName($pre . $key, 'templates'); 
     } else {
       $t->name = $full_name;
     }
@@ -362,6 +435,24 @@ class ProcessOrderPages extends Process {
         }
       }
       return true;
+  }
+
+  /**
+ * Create a new field
+ *
+ * @param    string $fieldname Name of field
+ * @param    array $options [string $fieldtype, $string $label]
+ * @return   Object The new field
+ *
+  *
+ */
+  protected function makeField($fieldname, $options) {
+    $f = new Field();
+    $f->type = $this->modules->get($options['fieldtype']);
+    $f->name = $this->validateName($this->settings['pre'] . $fieldname, 'fields');
+    $f->label = $options['label'];
+    $f->save();
+    return $f;
   }
 
   /**
