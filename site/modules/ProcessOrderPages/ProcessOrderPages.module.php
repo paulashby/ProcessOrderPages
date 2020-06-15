@@ -4,7 +4,7 @@ class ProcessOrderPages extends Process {
 
   public static function getModuleinfo() {
     return [
-      'title' => 'Process Install Test',
+      'title' => 'Process Order Pages',
       'summary' => 'Allows order pages to be created on front end and managed via admin.',
       'author' => 'Paul Ashby, primitive.co',
       'version' => 1,
