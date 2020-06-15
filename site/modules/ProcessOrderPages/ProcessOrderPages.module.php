@@ -4,10 +4,11 @@ class ProcessOrderPages extends Process {
 
   public static function getModuleinfo() {
     return [
-      'title' => 'Process Order Pages',
+      'title' => 'Process Install Test',
       'summary' => 'Allows order pages to be created on front end and managed via admin.',
       'author' => 'Paul Ashby, primitive.co',
       'version' => 1,
+      'singular' => true,
       'requires' => [
         'FieldtypeTextUnique>=1.0.0'
       ],
@@ -22,23 +23,18 @@ class ProcessOrderPages extends Process {
     ];
   }
   protected $settings = array(
-    'pre' => 'pop_'
-  );
-  protected $line_item_fields = array(
-    'customer'      =>  array('fieldtype'=>'FieldtypeText', 'label'=>'Customer'),
-    'sku_ref'       =>  array('fieldtype'=>'FieldtypeText', 'label'=>'Record of cart item sku'),
-    'quantity'      =>  array('fieldtype'=>'FieldtypeInteger', 'label'=>'Number of packs'),
-    'total'         =>  array('fieldtype'=>'FieldtypeInteger', 'label'=>'Line item total')
-  );
-  protected $step_pages = array(
-    'cart-items'        =>  array('title'=>'Cart Items', 'template'=>'cart-item'),
-    'pending-orders'     =>  array('title'=>'Pending Orders', 'template'=>'step'),
-    'active-orders'     =>  array('title'=>'Active Orders', 'template'=>'step'),
-    'completed-orders'  =>  array('title'=>'Completed Orders', 'template'=>'step')
-  );
-  protected $step_templates_setup = array(
-  );
-  protected $step_templates = array(
+    'line_item_fields' => array(
+      'customer'      =>  array('fieldtype'=>'FieldtypeText', 'label'=>'Customer'),
+      'sku_ref'       =>  array('fieldtype'=>'FieldtypeText', 'label'=>'Record of cart item sku'),
+      'quantity'      =>  array('fieldtype'=>'FieldtypeInteger', 'label'=>'Number of packs'),
+      'total'         =>  array('fieldtype'=>'FieldtypeInteger', 'label'=>'Line item total')
+      ),
+    'step_pages' => array(
+      'cart-items'        =>  array('title'=>'Cart Items', 'template'=>'cart-item'),
+      'pending-orders'     =>  array('title'=>'Pending Orders', 'template'=>'step'),
+      'active-orders'     =>  array('title'=>'Active Orders', 'template'=>'step'),
+      'completed-orders'  =>  array('title'=>'Completed Orders', 'template'=>'step')
+    )
   );
 
   public function init() {
@@ -46,8 +42,7 @@ class ProcessOrderPages extends Process {
      parent::init();
 
     // include css
-
-    $this->addHookAfter('InputfieldForm::render', function(HookEvent $event) {
+     $this->addHookAfter('InputfieldForm::render', function(HookEvent $event) {
 
       // Add class suffix for css to remove top margin and set button colour according to status
       $return = $event->return;
@@ -60,79 +55,88 @@ class ProcessOrderPages extends Process {
       $event->return = str_replace(array('uk-margin-top', 'ui-button'), array('', 'ui-button ui-button' . $class_suffix), $return);
     });
   }
-  public function ___install() {
 
-    parent::___install();
+/**
+ * Add product to cart (creates a line-item page as child of /processwire/orders/cart-items)
+ *
+ * @param    string $item The submitted form
+ * @return   string The configured field name
+ *
+ */
+  public function addToCart($item) {
+    if( ! $this->ready) {
+      $this->completeInstallation();
+    }
 
-    $pre = $this->settings['pre'];
-
-    // Initalised here as it must be possible to evaluate class member properties at compile time
-    $this->settings['line_item_template_name'] = $this->validateName($pre . 'line-item', 'templates');
-    $this->settings['order_template_name'] = $this->validateName($pre . 'order', 'templates'); 
+    $sku = $this->sanitizer->text($item->sku);
+    $quantity = $this->sanitizer->int($item->quantity);
+    $price = $this->sanitizer->int($item->price);
     
-    $this->step_templates_setup['cart-item'] = $this->settings['line_item_template_name'];
-    $this->step_templates_setup['order'] = $this->settings['line_item_template_name'];
-    $this->step_templates_setup['step'] = $this->settings['order_template_name'];
+    // Is there an existing order for this product?
+    $template = $this['t_line-item'];
+    $customer_field = $this['f_customer'];
+    $sku_field = $this['f_sku_ref'];
+    $user_id = $this->users->getCurrentUser()->id;
+    $exists_in_cart = $this->pages->findOne('template=' . $template . ', ' . $customer_field . '=' . $user_id . ', ' . $sku_field . '=' . $sku);
 
-    // Make text field for unique sku on product page - we leave this in place when uninstalling to avoid problems with product listings, 
-    // so check it doesn't exist before adding in case we're reinstalling
-    $sku_exists = $this->fields->get($pre . 'sku');
-    if( ! $sku_exists) {
-      $unique_sku = $this->makeField('sku', array('fieldtype'=>'FieldtypeTextUnique', 'label'=>'SKU - Unique product identifier'));
+    if($exists_in_cart->id) {
+      
+      // Add to existing item
+      $sum = $quantity + $exists_in_cart[$this['f_quantity']];
+      $total = $price + $exists_in_cart[$this['f_total']];
+      $exists_in_cart->of(false);
+      $exists_in_cart->set($this['f_quantity'], $sum);
+      $exists_in_cart->set($this['f_total'], $total);
+      $exists_in_cart->save();
+
+    } else { 
+
+      // Create a new item
+      $item_title = $sku . ': ' . $this->users->get($user_id)->display_name;
+      $item_data = array(
+        'title' => $item_title,
+        'price' => $price
+      );
+      $item_data[$this['f_customer']] = $user_id;
+      $item_data[$this['f_sku_ref']] = $sku;
+      $item_data[$this['f_quantity']] = $quantity;
+      $item_data[$this['f_total']] = $price;
+
+      bd($item_data);
+
+      $cart_item = $this->wire('pages')->add($this['t_cart-item'],  '/processwire/orders/cart-items', $item_data);
     }
-
-    // Make template for line item pages
-    $fg = new Fieldgroup();
-    $fgname = $this->validateName($pre . 'line-item', 'fieldgroups');
-    $fg->name = $fgname;
-    $fg->add($this->fields->get('title'));
-
-    foreach ($this->line_item_fields as $fieldname => $options) {
-      $f = $this->makeField($fieldname, $options);
-      $fg->add($f);
-    }
-
-    $fg->save();
-
-    $line_item_template = new Template();
-    $line_item_template->name = $this->settings['line_item_template_name'];
-    $line_item_template->fieldgroup = $fg;
-    $line_item_template->save();
-
-    // Make template for cart items page, order pages, order step pages (Orders/Cart Items, Orders/Active, Orders/Complete) - set permitted child pages
-    foreach ($this->step_templates_setup as $name => $chld_pg_tmplt_name) {
-      $this->step_templates[$name] = $this->makeSimpleTemplate($name, array($chld_pg_tmplt_name));
-    }
-
-    // Make pages for order steps - these are parent pages for cart items, active orders and completed orders
-    foreach ($this->step_pages as $raw_name => $setup) { 
-      $pg_name = $this->validateName($pre . $raw_name, 'pages');
-      $this->makePage($this->step_templates[$setup['template']], '/processwire/orders/', $pg_name, $setup['title']);
-    } 
+    return json_encode(Array("success"=>true));
+  }
+/**
+ * Get name submitted in config
+ *
+ * @param    string name of configuration field
+ * @return   string The configured field name
+ *
+ */
+  public function getName($req) {
+    return $this[$req];
   }
   public function ___uninstall() {
 
-    $pre = $this->settings['pre'];
-
     // Going to leave sku field as this will have been used on product pages
 
-    $this->removeTemplate($pre . 'line-item', $this->line_item_fields);
+    // Throw error if not safe to unisntall
+    $this->checkTemplates();
+    $this->checkPages();
 
-    // Safe to remove the following as all line-items will have been removed
+    // Remove display_name field from user template
+    $rm_fld = wire('fields')->get('display_name');
+    $ufg = wire('fieldgroups')->get('user');
+    $ufg->remove($rm_fld);
+    $ufg->save();
+    wire('fields')->delete($rm_fld);
 
     // Remove order step pages (Cart Items, Active Orders, Completed Orders)
-    foreach ($this->step_pages as $pg => $value) {
-      $pg_selector = 'name='. $pre . $pg; 
-      
-      if(wire('pages')->count($pg_selector)){
-        wire('pages')->get($pg_selector)->delete(true); 
-      }
-    }
-
-    // Remove templates
-    $this->removeTemplate($pre . 'cart-item');
-    $this->removeTemplate($pre . 'step');
-    $this->removeTemplate($pre . 'order');
+    $this->removeStepPages();
+    $this->removeTemplates();
+    $this->removeFields();
 
     // Remove admin Order page - now that its child pages have been removed
     parent::___uninstall();
@@ -237,89 +241,82 @@ class ProcessOrderPages extends Process {
     return $out;
   }
 
-  public function ___executeMysecondpage() {
-
-    $out = '<p>Hello Page2 :)</p>';
-    $out .= '<p><a href="./" class="ui-button ui-state-default">Go to Page 1</a></p>';
-
-    return $out;
-  }
- /**
- * Add product to cart
+/**
+ * Create all fields, templates and pages required by the module
  *
- * @param    WireInputData  $item Form data
- * @return   Json
+ * @return   Object The new field
  *
-  *
  */
-  public function addToCart($item) {
+  public function completeInstallation() {
 
-    $pre = $this->settings['pre'];
+    // Not including the sku field - it's up to the user to create and add to their products
 
-    $sku =  $this->sanitizer->text($item->sku);
-    $quantity = $this->sanitizer->int($item->quantity);
-    $price = $this->sanitizer->int($item->price);
-    $pre = $pre;
+    $required_fields = array(
+      'f_customer'          =>  array('fieldtype'=>'FieldtypeText', 'label'=>'Customer'),
+      'f_sku_ref'           =>  array('fieldtype'=>'FieldtypeText', 'label'=>'Record of cart item sku'),
+      'f_quantity'          =>  array('fieldtype'=>'FieldtypeInteger', 'label'=>'Number of packs'),
+      'f_total'             =>  array('fieldtype'=>'FieldtypeInteger', 'label'=>'Line item total')
+    );
+    $required_templates = array(
+      't_line-item'         => array('t_parents' => array('t_cart-item', 't_order'), 't_fields'=>array('f_customer', 'f_sku', 'f_sku_ref', 'f_quantity', 'f_total')),
+      't_cart-item'         => array('t_parents' => array('admin'), 't_children' => array('t_line-item')),
+      't_order'             => array('t_parents' => array('t_step'), 't_children' => array('t_line-item')),
+      't_step'              => array('t_parents' => array('admin'), 't_children' => array('t_order')),
+    );
+    $required_pages = array(
+      'p_cart-items'        =>  array('template' => 't_cart-item', 'parent'=>'/processwire/orders/', 'title'=>'Cart Items'),
+      'p_pending-orders'    =>  array('template' => 't_step', 'parent'=>'/processwire/orders/', 'title'=>'Pending Orders', ),
+      'p_active-orders'     =>  array('template' => 't_step', 'parent'=>'/processwire/orders/', 'title'=>'Active Orders', ),
+      'p_completed-orders'  =>  array('template' => 't_step', 'parent'=>'/processwire/orders/', 'title'=>'Completed Orders', )
+    );
 
-    // Is there an existing order for this product?
-    $template = $pre . 'line-item';
-    $customer_field = $pre . 'customer';
-    $sku_field = $pre . 'sku_ref';
-    $user_id = $this->users->getCurrentUser()->id;
-    $user_display_name = $this->users->get($user_id);
-    $exists_in_cart = $this->pages->findOne('template=' . $template . ', ' . $customer_field . '=' . $user_id . ', ' . $sku_field . '=' . $sku);
-
-    if($exists_in_cart->id) {
-      
-      // Add to existing order
-      $sum = $quantity + $exists_in_cart[$pre . 'quantity'];
-      $total = $price + $exists_in_cart[$pre . 'total'];
-      $item_title = $sku . ' x ' . $sum . ' for ' . $user_display_name;
-      $exists_in_cart->of(false);
-      $exists_in_cart->set('title', $item_title);
-      $exists_in_cart->set($pre . 'quantity', $sum);
-      $exists_in_cart->set($pre . 'total', $total);
-      $exists_in_cart->save();
-
-    } else {  
-
-      //TODO: It's not cool naming this with quantity since it can change!
-      // Add a new order
-      $item_title = $sku . ' x ' . $quantity . ' for ' . $user_display_name;
-      $item_data = array(
-        'title' => $item_title,
-        'price' => $price
-      );
-      $item_data[$pre . 'customer'] = $user_id;
-      $item_data[$pre . 'sku_ref'] = $sku;
-      $item_data[$pre . 'quantity'] = $quantity;
-      $item_data[$pre . 'total'] = $price;
-
-      bd($item_data);
-
-      $cart_item = $this->wire('pages')->add($template, '/processwire/orders/' . $pre . 'cart-items', $item_data);
+    foreach ($required_fields as $key => $spec) {
+      $this->makeField($key, $spec);
     }
-    return json_encode(Array("success"=>true));
+    foreach ($required_templates as $key => $spec) {
+      $this->makeTemplate($key, $spec);
+    }
+    foreach ($required_pages as $key => $spec) {
+      $this->makePage($key, $spec);
+    }
+
+    // Add display_name field to user template
+    $f = new Field();
+    $f->type = $this->modules->get('FieldtypeText');
+    $f->name = 'display_name'; // From config
+    $f->label = 'Name displayed on orders';
+    $f->save();
+    $usr_template = $this->templates->get('user');
+    $ufg = $usr_template->fieldgroup;
+    $ufg->add($f);
+    $ufg->save();
+
+    $data = $this->modules->getConfig('ProcessInstallTest');
+    $data['ready'] = 'true';
+    $this->modules->saveConfig('ProcessInstallTest', $data);
   }
-  /**
+
+///////
+
+/**
  * Change quantity of cart item
  *
  * @param    string  $sku The item to update
  * @param    string  $qty The new value
  * @return   Json
  *
-  *
+ *
  */
   public function changeQuantity($sku, $qty) {
 
-    $pre = $this->settings['pre'];
+    // $pre = $this->settings['pre'];
     $skus = $this->sanitizer->text($sku);
     $qtys = $this->sanitizer->text($qty);
 
     $user_id = $this->users->getCurrentUser()->id;
-    $template_name = $pre . 'line-item';
-    $customer_field_name = $pre . 'customer';
-    $sku_field_name = $pre . 'sku_ref';
+    $template_name = $this['t_line-item'];
+    $customer_field_name = $this['f_customer'];
+    $sku_field_name = $this['f_sku_ref'];
 
     $selector = 'template=' . $template_name . ', ' . $customer_field_name . '=' .  $user_id . ', ' . $sku_field_name . '=' . $skus;
     $cart_item = $this->pages->findOne($selector);
@@ -332,51 +329,12 @@ class ProcessOrderPages extends Process {
     }
     return json_encode(array('error'=>'The item could not be found'));
   }
-
- /**
- * Get prefix string
- *
- * @return   string Prefix
- *
-  *
- */
-  public function getPrefix() {
-    return $this->settings['pre'];
-  }
-
-  /**
- * Check whether field name exists
- *
- * @param    string  $key The field name to check
- * @param    string  $existing The data type to check - page, field etc
- * @return   string
- *
- * @throws   WireException if $existing already has element named with the provided key.
-  *
- */
-  protected function validateName($key, $existing) {
-
-    $selector = 'name=' . $key;
-
-    if($existing === 'pages') {
-      $exists = $this[$existing]->count($selector); 
-    } else {
-      $exists = $this[$existing]->get($selector);
-    }
-    
-    if($exists) {
-      $existing_type = substr($existing, 0, -1); // Remove last character - 's'
-      throw new WireException($existing_type . ' with name "' . $key . '" already exists.');
-    }
-    return $key;
-  }
-
-  /**
+/**
  * Get order number
  *
  * @return   string The next free order number
  *
-  *
+ *
  */
   protected function getOrderNum() {
 
@@ -390,7 +348,7 @@ class ProcessOrderPages extends Process {
  * @param    string  $val The number to base new orders on
  * @return   boolean
  *
-  *
+ *
  */
   protected function setOrderNum($val) {
 
@@ -404,7 +362,7 @@ class ProcessOrderPages extends Process {
  *
  * @return   string The new order number
  *
-  *
+ *
  */
   protected function incrementOrderNum() {
 
@@ -416,109 +374,259 @@ class ProcessOrderPages extends Process {
     return $data['order_num'];
   }
 
+
+
+///////
+
 /**
- * Create a template with single field for title
+ * Check if any templates in use
  *
- * @param    string $key Name for the new template
- * @param    array $child_tmpl Array of permitted child template names
+ * @param    templateArray $rm_templates templates created by module
+ * @return   Array of used templat names or Boolean false
+ *
+ *
+ */
+  protected function inUse($rm_templates) {
+    $used = [];
+    foreach ($rm_templates as $rmt) {
+      if($rmt->getNumPages()) {
+        $used[] = $rmt->name;
+      }
+    }
+    return count($used) ? $used : false;
+  }
+/**
+ * Throw error if templates are in use
+ *
+* @return  Boolean true if safe to remove
+ */
+  protected function checkTemplates() {
+    $rmt_selector = 'name=' .
+      $this['t_line-item'] . '|' .
+      $this['t_cart-item'] . '|' .
+      $this['t_order'] . '|' .
+      $this['t_step'];
+    
+    $rm_templates = $this->templates->find($rmt_selector);
+    $used_t = $this->inUse($rm_templates);
+
+    // Throw error if templates in use
+    if($used_t) {
+      $e_messg = 'Unable to unistall module as the following templates are in use: ';
+      $append = ', ';
+      foreach ($used_t as $key => $elmt) {
+        $e_messg .= $key;
+        end($used_t); // get last key of array
+        if ($key === key($used_t) - 1){ // compare with current key to see if this is final iteration
+          $append = ' and ';
+        } else if ($key === key($used_t)){ // compare with current key to see if this is final iteration
+          $append = '';
+        }
+        $e_messg .= $append;
+      }
+      throw new WireException($e_messg);
+    }
+    return true;
+  }
+/**
+ * Throw error if pages are in use
+ *
+ * @return  Boolean true if safe to remove
+ */
+  protected function checkPages() {
+    $e_messg = 'Unable to install module as there are orders in progress. You can permanently delete this data from the /processwire/orders page, then try again';
+    $ps = $this->getStepPages();
+    foreach ($ps as $pg) {
+      if($pg->numChildren()) {
+        throw new WireException($e_messg);
+      }
+    }
+  }
+/**
+ * Get the pages created by the module
+ *
+* @return   PageArray The pages
+ *
+ *
+ */
+  protected function getStepPages() {
+    return $this->pages->find('name=cart-items|pending-orders|active-orders|completed-orders');
+  }
+/**
+ * Delete all step pages
+ *
+ * @return  Boolean true
+ */
+  protected function removeStepPages() {
+    $ps = $this->getStepPages();
+    foreach ($ps as $pg) {
+      if($pg->id){
+        $pg->delete(true);  
+      } else {
+        return false;
+      }
+    }
+    return true;
+  }
+/**
+ * Remove all module fields other than 'sku'
+ *
+ * @return   Boolean
+ *
+ *
+ */
+  protected function removeFields() {
+    
+    $fields = array('f_customer', 'f_sku_ref', 'f_total');
+  
+    foreach($fields as $f => $options) {
+      $curr_f = wire('fields')->get($this[$f]);
+      if($curr_f->id) {
+        wire('fields')->delete($curr_f); 
+      } else {
+        return false;
+      }
+    }
+    return true;
+  }
+/**
+ * Remove all module templates
+ *
+ * @return   Boolean
+ *
+ *
+ */
+  protected function removeTemplates() {
+
+    $ts = array('t_line-item', 't_cart-item', 't_order', 't_step');
+
+    foreach ($ts as $t) {
+      $curr_t = $this->templates->get($this[$t]);
+      if($curr_t->id) {
+         $this->removeTemplate($curr_t);
+      } else {
+        return false;
+      }
+    }
+    return true;
+  }
+/**
+ * Remove a template
+ *
+ * @param    string $key Name of the template to delete
+ * @return   Boolean
+ *
+ *
+ */
+  protected function removeTemplate($key) {
+    
+    $rm_tmplt = $this->templates->get($key);
+    if($rm_tmplt->id) {
+
+      $rm_fldgrp = $rm_tmplt->fieldgroup;
+
+      if ($rm_tmplt->getNumPages()) {
+          throw new WireException('Unable to unistall module as the ' . $rm_tmplt->name .' template is in use');
+      } else {
+          wire('templates')->delete($rm_tmplt);
+          wire('fieldgroups')->delete($rm_fldgrp);
+        }
+      return true;
+    }
+    return false;
+  }
+/**
+ * Make a field
+ *
+ * @param    string $key Name of field
+ * @param    array $spec [string 'fieldtype', string 'label']
+ * @return   Object The new field
+ *
+ *
+ */
+  protected function makeField($key, $spec) {
+    $f = new Field();
+    $f->type = $this->modules->get($spec['fieldtype']);
+    $f->name = $this[$key]; // From config
+    $f->label = $spec['label'];
+    $f->save();
+    return $f;
+  }
+/**
+ * Make a template
+ *
+ * @param    string $key Name of template with 'p_' prepended
+ * @param    array $spec [array $t_parents [string Template name], array $t_children [string Template name], $array T_field $array [string Field name]]
  * @return   Object The new template
  *
-  *
+ *
  */
-  protected function makeSimpleTemplate($key, $child_tmpl, $full_name = null) {
-
-    $pre = $this->settings['pre'];
-
+  protected function makeTemplate($key, $spec) {
     $fg = new Fieldgroup();
-    $fg->name = $this->validateName($pre . $key, 'fieldgroups');
+    $fg->name = str_replace('t_', 'fg_', $this[$key]);
     $fg->add($this->fields->get('title'));
-    $fg->save();
-    $t = new Template();
-    if(is_null($full_name)) {
-      $t->name = $this->validateName($pre . $key, 'templates'); 
-    } else {
-      $t->name = $full_name;
+    if($key === 't_line-item') {
+      foreach ($spec['t_fields'] as $key) {
+        $fg->add($this[$key]); // From config
+      }
     }
-    
+
+    $fg->save();
+
+    $t = new Template();
+    $t->name = $this[$key];
     $t->fieldgroup = $fg;
     $t->save();
 
-    $t->childTemplates = $child_tmpl;
-    // $t->childTemplates($child_tmpl);
+    if(array_key_exists('t_parents', $spec)) {
+      // Set permitted parent templates
+      $f_selector = $this->getFamilySelector($spec['t_parents']);
+     $t->parentTemplates = $this->templates->find($f_selector);
+    }
+
+    if(array_key_exists('t_children', $spec)) {
+      // Set permitted child templates
+      $f_selector = $this->getFamilySelector($spec['t_children']);
+      $t->childTemplates = $this->templates->find($f_selector);
+    }
+
     $t->save();
     return $t;
   }
 
-  /**
-   * Remove a template
-   *
-   * @param    string $key Name of the template to delete
-   * @param    associative array List of fields
-   * @return   Boolean
-   *
-    *
-   */
-  protected function removeTemplate($key, $fields=null) {
-    
-    $rm_tmplt = $this->templates->get($key);
-    // $rm_fldgrp = $this->fieldgroups->get($key);
-    $rm_fldgrp = $rm_tmplt->fieldgroup;
-
-    if ($rm_tmplt->getNumPages() > 0) {
-        throw new WireException("Can't uninstall because template is in use by some pages.");
-    } else {
-        wire('templates')->delete($rm_tmplt);
-        wire('fieldgroups')->delete($rm_fldgrp);
-
-        if( ! is_null($fields)) {
-          foreach($fields as $fieldname => $options) {
-            $rm_fld = wire('fields')->get($this->settings['pre'] . $fieldname);
-            wire('fields')->delete($rm_fld);
-          }
-        }
-      }
-      return true;
-  }
-
-  /**
- * Create a new field
+/**
+ * Create a new page
  *
- * @param    string $fieldname Name of field
- * @param    array $options [string $fieldtype, $string $label]
- * @return   Object The new field
+ * @param    string $key Name of page
+ * @param    array $spec [string 'template' - name of template, string 'parent' - path of parent page, string 'title']
+ * @return   Object The new page
  *
-  *
+ *
  */
-  protected function makeField($fieldname, $options) {
-    $f = new Field();
-    $f->type = $this->modules->get($options['fieldtype']);
-    $f->name = $this->validateName($this->settings['pre'] . $fieldname, 'fields');
-    $f->label = $options['label'];
-    $f->save();
-    return $f;
-  }
-
-  /**
-   * Create a new page
-   *
-   * @param    string $template Name of template to use for the new page
-   * @param    string $parent Path to parent of the new page eg ('/about/')
-   * @param    string $name Name used in the page url
-   * @param    string $title Set page title
-   * @return   Object The new page
-   *
-    *
-   */
-  protected function makePage($template, $parent, $name, $title) {
-
-    $p = $this->wire(new Page()); // create new page object
-    $p->template = $template;
-    $p->parent = wire('pages')->get($parent); // set the parent
-    $p->name = $name; // give it a name used in the url for the page
-    if( ! is_null($title)) {
-      $p->title = $title; // set page title (not neccessary but recommended)
-    }
+  protected function makePage($key, $spec) {
+    $p = $this->wire(new Page());
+    $p->template = $this[$spec['template']];
+    $p->parent = wire('pages')->get($spec['parent']);
+    $p->name = str_replace('p_', '', $key); // Name used in url - we're not allowing custom page names in config
+    $p->title = $spec['title'];
     $p->save();
+
     return $p;
   }
+/**
+ * Make a template selector string
+ *
+ * @param    string $relation to current template
+ * @return   string The selctor string
+ *
+ *
+ */
+  protected function getFamilySelector($relation) {
+    $t_selector = 'name=';
+    foreach ($relation as $searchkey) {
+      $t_selector .= $searchkey . '|';
+    }
+    return $t_selector;
+  }
+
 }
