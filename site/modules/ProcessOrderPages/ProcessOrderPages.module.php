@@ -22,21 +22,6 @@ class ProcessOrderPages extends Process {
       ],
     ];
   }
-  protected $settings = array(
-    'line_item_fields' => array(
-      'customer'      =>  array('fieldtype'=>'FieldtypeText', 'label'=>'Customer'),
-      'sku_ref'       =>  array('fieldtype'=>'FieldtypeText', 'label'=>'Record of cart item sku'),
-      'quantity'      =>  array('fieldtype'=>'FieldtypeInteger', 'label'=>'Number of packs'),
-      'total'         =>  array('fieldtype'=>'FieldtypeInteger', 'label'=>'Line item total')
-      ),
-    'step_pages' => array(
-      'cart-items'        =>  array('title'=>'Cart Items', 'template'=>'cart-item'),
-      'pending-orders'     =>  array('title'=>'Pending Orders', 'template'=>'step'),
-      'active-orders'     =>  array('title'=>'Active Orders', 'template'=>'step'),
-      'completed-orders'  =>  array('title'=>'Completed Orders', 'template'=>'step')
-    )
-  );
-
   public function init() {
 
      parent::init();
@@ -234,9 +219,7 @@ class ProcessOrderPages extends Process {
       'f_total'             =>  array('fieldtype'=>'FieldtypeInteger', 'label'=>'Line item total')
     );
     $required_templates = array(
-      // JUST INSTALLED _ SO CHECK THIS THEN ADD TO CART
-      //TODO: Something going wrong when creating line-item ramplte - it's geeitng called 'total' - summat to do with last entry in array here?
-      't_line-item'         => array('t_parents' => array('t_cart-item', 't_order'), 't_fields'=>array('f_customer', 'f_sku', 'f_sku_ref', 'f_quantity', 'f_total')),
+      't_line-item'         => array('t_parents' => array('t_cart-item', 't_order'), 't_fields'=>array('f_customer', 'f_sku_ref', 'f_quantity', 'f_total')),
       't_cart-item'         => array('t_parents' => array('admin'), 't_children' => array('t_line-item')),
       't_order'             => array('t_parents' => array('t_step'), 't_children' => array('t_line-item')),
       't_step'              => array('t_parents' => array('admin'), 't_children' => array('t_order')),
@@ -292,10 +275,12 @@ class ProcessOrderPages extends Process {
 
       // Remove display_name field from user template
       $rm_fld = wire('fields')->get($this['f_display_name']);
-      $ufg = wire('fieldgroups')->get('user');
-      $ufg->remove($rm_fld);
-      $ufg->save();
-      wire('fields')->delete($rm_fld);
+      if($rm_fld !== null) {
+        $ufg = wire('fieldgroups')->get('user');
+        $ufg->remove($rm_fld);
+        $ufg->save();
+        wire('fields')->delete($rm_fld);
+      }
 
       foreach ($module_elmts['pages'] as $pg) {
         $selector = 'name=' . $pg;
@@ -340,7 +325,6 @@ class ProcessOrderPages extends Process {
  */
   public function changeQuantity($sku, $qty) {
 
-    // $pre = $this->settings['pre'];
     $skus = $this->sanitizer->text($sku);
     $qtys = $this->sanitizer->text($qty);
 
@@ -404,10 +388,6 @@ class ProcessOrderPages extends Process {
     $this->modules->saveConfig('ProcessOrderPages', $data);
     return $data['order_num'];
   }
-
-
-
-///////
 /**
  * Check it's safe to delete provided items
  *
