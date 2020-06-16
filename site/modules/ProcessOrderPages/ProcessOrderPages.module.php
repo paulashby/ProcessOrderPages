@@ -68,10 +68,8 @@ class ProcessOrderPages extends Process {
       
       // Add to existing item
       $sum = $quantity + $exists_in_cart[$this['f_quantity']];
-      $total = $price + $exists_in_cart[$this['f_total']];
       $exists_in_cart->of(false);
       $exists_in_cart->set($this['f_quantity'], $sum);
-      $exists_in_cart->set($this['f_total'], $total);
       $exists_in_cart->save();
 
     } else { 
@@ -85,7 +83,6 @@ class ProcessOrderPages extends Process {
       $item_data[$this['f_customer']] = $user_id;
       $item_data[$this['f_sku_ref']] = $sku;
       $item_data[$this['f_quantity']] = $quantity;
-      $item_data[$this['f_total']] = $price;
 
       bd($item_data);
 
@@ -215,11 +212,10 @@ class ProcessOrderPages extends Process {
     $required_fields = array(
       'f_customer'          =>  array('fieldtype'=>'FieldtypeText', 'label'=>'Customer'),
       'f_sku_ref'           =>  array('fieldtype'=>'FieldtypeText', 'label'=>'Record of cart item sku'),
-      'f_quantity'          =>  array('fieldtype'=>'FieldtypeInteger', 'label'=>'Number of packs'),
-      'f_total'             =>  array('fieldtype'=>'FieldtypeInteger', 'label'=>'Line item total')
+      'f_quantity'          =>  array('fieldtype'=>'FieldtypeInteger', 'label'=>'Number of packs')
     );
     $required_templates = array(
-      't_line-item'         => array('t_parents' => array('t_cart-item', 't_order'), 't_fields'=>array('f_customer', 'f_sku_ref', 'f_quantity', 'f_total')),
+      't_line-item'         => array('t_parents' => array('t_cart-item', 't_order'), 't_fields'=>array('f_customer', 'f_sku_ref', 'f_quantity')),
       't_cart-item'         => array('t_parents' => array('admin'), 't_children' => array('t_line-item')),
       't_order'             => array('t_parents' => array('t_step'), 't_children' => array('t_line-item')),
       't_step'              => array('t_parents' => array('admin'), 't_children' => array('t_order')),
@@ -268,7 +264,7 @@ class ProcessOrderPages extends Process {
     $module_elmts = array(
       'pages' => array('cart-items', 'pending-orders', 'active-orders', 'completed-orders'),
       'templates' => array('t_line-item', 't_cart-item', 't_order', 't_step'),
-      'fields' => array('f_display_name', 'f_customer', 'f_sku_ref', 'f_quantity', 'f_total')
+      'fields' => array('f_display_name', 'f_customer', 'f_sku_ref', 'f_quantity')
     );
 
     if($this->preflightUninstall($module_elmts['pages'])) {

@@ -58,14 +58,6 @@ $config = array(
 		'value' => 'quantity', 
 		'required' => true 
 	),
-	'totalField' => array(
-		'name'=> 'f_total',
-		'type' => 'text', 
-		'label' => 'Name for quantity field',//This is the label of the field on the config page
-		'description' => 'Please use a unique name if this collides with an existing field name',  
-		'value' => 'total', 
-		'required' => true 
-	),
 	'lineItemTemplate' => array(
 		'name'=> 't_line-item',
 		'type' => 'text', 
