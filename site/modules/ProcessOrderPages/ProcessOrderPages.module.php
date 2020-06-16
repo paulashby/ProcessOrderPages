@@ -118,7 +118,7 @@ class ProcessOrderPages extends Process {
   public function getName($req) {
     return $this[$req];
   }
-  public function ___uninstall() {
+  public function ___nuninstall() {
 
     // Going to leave sku field as this will have been used on product pages
 
@@ -291,9 +291,9 @@ class ProcessOrderPages extends Process {
     $ufg->add($f);
     $ufg->save();
 
-    $data = $this->modules->getConfig('ProcessInstallTest');
+    $data = $this->modules->getConfig('ProcessOrderPages');
     $data['ready'] = 'true';
-    $this->modules->saveConfig('ProcessInstallTest', $data);
+    $this->modules->saveConfig('ProcessOrderPages', $data);
   }
 
 ///////
