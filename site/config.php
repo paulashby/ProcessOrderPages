@@ -108,5 +108,5 @@ $config->httpHosts = array('www.order-pages.io', 'order-pages.io');
  * Should be true for development sites and false for live/production sites. 
  * 
  */
-$config->debug = true;
+$config->debug = false;
 

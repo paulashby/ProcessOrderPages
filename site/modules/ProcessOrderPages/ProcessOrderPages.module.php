@@ -92,7 +92,7 @@ class ProcessOrderPages extends Process {
     } else { 
 
       // Create a new item
-      $item_title = $sku . ': ' . $this->users->get($user_id)->display_name;
+      $item_title = $sku . ': ' . $this->users->get($user_id)[$this['f_display_name']];
       $item_data = array(
         'title' => $item_title,
         'price' => $price
@@ -104,7 +104,7 @@ class ProcessOrderPages extends Process {
 
       bd($item_data);
 
-      $cart_item = $this->wire('pages')->add($this['t_cart-item'],  '/processwire/orders/cart-items', $item_data);
+      $cart_item = $this->wire('pages')->add($this['t_line-item'],  '/processwire/orders/cart-items', $item_data);
     }
     return json_encode(Array("success"=>true));
   }
@@ -117,30 +117,6 @@ class ProcessOrderPages extends Process {
  */
   public function getName($req) {
     return $this[$req];
-  }
-  public function ___nuninstall() {
-
-    // Going to leave sku field as this will have been used on product pages
-
-    // Throw error if not safe to unisntall
-    $this->checkTemplates();
-    $this->checkPages();
-
-    // Remove display_name field from user template
-    $rm_fld = wire('fields')->get('display_name');
-    $ufg = wire('fieldgroups')->get('user');
-    $ufg->remove($rm_fld);
-    $ufg->save();
-    wire('fields')->delete($rm_fld);
-
-    // Remove order step pages (Cart Items, Active Orders, Completed Orders)
-    $this->removeStepPages();
-    $this->removeTemplates();
-    $this->removeFields();
-
-    // Remove admin Order page - now that its child pages have been removed
-    parent::___uninstall();
-
   }
   public function ___execute() {
     
@@ -258,6 +234,8 @@ class ProcessOrderPages extends Process {
       'f_total'             =>  array('fieldtype'=>'FieldtypeInteger', 'label'=>'Line item total')
     );
     $required_templates = array(
+      // JUST INSTALLED _ SO CHECK THIS THEN ADD TO CART
+      //TODO: Something going wrong when creating line-item ramplte - it's geeitng called 'total' - summat to do with last entry in array here?
       't_line-item'         => array('t_parents' => array('t_cart-item', 't_order'), 't_fields'=>array('f_customer', 'f_sku', 'f_sku_ref', 'f_quantity', 'f_total')),
       't_cart-item'         => array('t_parents' => array('admin'), 't_children' => array('t_line-item')),
       't_order'             => array('t_parents' => array('t_step'), 't_children' => array('t_line-item')),
@@ -283,7 +261,7 @@ class ProcessOrderPages extends Process {
     // Add display_name field to user template
     $f = new Field();
     $f->type = $this->modules->get('FieldtypeText');
-    $f->name = 'display_name'; // From config
+    $f->name = $this['f_display_name'];
     $f->label = 'Name displayed on orders';
     $f->save();
     $usr_template = $this->templates->get('user');
@@ -291,9 +269,62 @@ class ProcessOrderPages extends Process {
     $ufg->add($f);
     $ufg->save();
 
+    // Set initial value of this field to user name 
+    foreach ($this->users->find("start=0") as $u) {
+        $u->of(false);
+        $u->set($this['f_display_name'], $u->name);
+        $u->save();
+    }
+
     $data = $this->modules->getConfig('ProcessOrderPages');
     $data['ready'] = 'true';
     $this->modules->saveConfig('ProcessOrderPages', $data);
+  }  
+  public function ___uninstall() {
+
+    $module_elmts = array(
+      'pages' => array('cart-items', 'pending-orders', 'active-orders', 'completed-orders'),
+      'templates' => array('t_line-item', 't_cart-item', 't_order', 't_step'),
+      'fields' => array('f_display_name', 'f_customer', 'f_sku_ref', 'f_quantity', 'f_total')
+    );
+
+    if($this->preflightUninstall($module_elmts['pages'])) {
+
+      // Remove display_name field from user template
+      $rm_fld = wire('fields')->get($this['f_display_name']);
+      $ufg = wire('fieldgroups')->get('user');
+      $ufg->remove($rm_fld);
+      $ufg->save();
+      wire('fields')->delete($rm_fld);
+
+      foreach ($module_elmts['pages'] as $pg) {
+        $selector = 'name=' . $pg;
+        $curr_p = $this->pages->findOne($selector);
+        if($curr_p->id) {
+          $curr_p->delete();
+        }
+      }
+      foreach ($module_elmts['templates'] as $t) {
+        $curr_t = $this->templates->get($this[$t]);
+        if( $curr_t !== null) {
+          $rm_fldgrp = $curr_t->fieldgroup;
+          wire('templates')->delete($curr_t);
+          wire('fieldgroups')->delete($rm_fldgrp);  
+        }
+      }
+      foreach($module_elmts['fields'] as $f) {
+        $curr_f = wire('fields')->get($this[$f]);
+        if($curr_f !== null) {
+          wire('fields')->delete($curr_f);
+        }
+      }
+
+      // Remove admin Order page - now that its child pages have been removed
+      parent::___uninstall();
+
+    } else {
+      throw new WireException('Unable to uninstall module as there are orders in progress. You can permanently delete this data from the /processwire/orders page, then try again');
+    }
   }
 
 ///////
@@ -377,163 +408,25 @@ class ProcessOrderPages extends Process {
 
 
 ///////
+/**
+ * Check it's safe to delete provided items
+ *
+ * @param   Array $ps Names of pages to check
+ * @return  Boolean
+ */
+  protected function preflightUninstall($ps) {
 
-/**
- * Check if any templates in use
- *
- * @param    templateArray $rm_templates templates created by module
- * @return   Array of used templat names or Boolean false
- *
- *
- */
-  protected function inUse($rm_templates) {
-    $used = [];
-    foreach ($rm_templates as $rmt) {
-      if($rmt->getNumPages()) {
-        $used[] = $rmt->name;
-      }
-    }
-    return count($used) ? $used : false;
-  }
-/**
- * Throw error if templates are in use
- *
-* @return  Boolean true if safe to remove
- */
-  protected function checkTemplates() {
-    $rmt_selector = 'name=' .
-      $this['t_line-item'] . '|' .
-      $this['t_cart-item'] . '|' .
-      $this['t_order'] . '|' .
-      $this['t_step'];
-    
-    $rm_templates = $this->templates->find($rmt_selector);
-    $used_t = $this->inUse($rm_templates);
-
-    // Throw error if templates in use
-    if($used_t) {
-      $e_messg = 'Unable to unistall module as the following templates are in use: ';
-      $append = ', ';
-      foreach ($used_t as $key => $elmt) {
-        $e_messg .= $key;
-        end($used_t); // get last key of array
-        if ($key === key($used_t) - 1){ // compare with current key to see if this is final iteration
-          $append = ' and ';
-        } else if ($key === key($used_t)){ // compare with current key to see if this is final iteration
-          $append = '';
-        }
-        $e_messg .= $append;
-      }
-      throw new WireException($e_messg);
-    }
-    return true;
-  }
-/**
- * Throw error if pages are in use
- *
- * @return  Boolean true if safe to remove
- */
-  protected function checkPages() {
-    $e_messg = 'Unable to install module as there are orders in progress. You can permanently delete this data from the /processwire/orders page, then try again';
-    $ps = $this->getStepPages();
+    // Check for ongoing orders
     foreach ($ps as $pg) {
-      if($pg->numChildren()) {
-        throw new WireException($e_messg);
-      }
-    }
-  }
-/**
- * Get the pages created by the module
- *
-* @return   PageArray The pages
- *
- *
- */
-  protected function getStepPages() {
-    return $this->pages->find('name=cart-items|pending-orders|active-orders|completed-orders');
-  }
-/**
- * Delete all step pages
- *
- * @return  Boolean true
- */
-  protected function removeStepPages() {
-    $ps = $this->getStepPages();
-    foreach ($ps as $pg) {
-      if($pg->id){
-        $pg->delete(true);  
-      } else {
-        return false;
-      }
-    }
-    return true;
-  }
-/**
- * Remove all module fields other than 'sku'
- *
- * @return   Boolean
- *
- *
- */
-  protected function removeFields() {
-    
-    $fields = array('f_customer', 'f_sku_ref', 'f_total');
-  
-    foreach($fields as $f => $options) {
-      $curr_f = wire('fields')->get($this[$f]);
-      if($curr_f->id) {
-        wire('fields')->delete($curr_f); 
-      } else {
-        return false;
-      }
-    }
-    return true;
-  }
-/**
- * Remove all module templates
- *
- * @return   Boolean
- *
- *
- */
-  protected function removeTemplates() {
-
-    $ts = array('t_line-item', 't_cart-item', 't_order', 't_step');
-
-    foreach ($ts as $t) {
-      $curr_t = $this->templates->get($this[$t]);
-      if($curr_t->id) {
-         $this->removeTemplate($curr_t);
-      } else {
-        return false;
-      }
-    }
-    return true;
-  }
-/**
- * Remove a template
- *
- * @param    string $key Name of the template to delete
- * @return   Boolean
- *
- *
- */
-  protected function removeTemplate($key) {
-    
-    $rm_tmplt = $this->templates->get($key);
-    if($rm_tmplt->id) {
-
-      $rm_fldgrp = $rm_tmplt->fieldgroup;
-
-      if ($rm_tmplt->getNumPages()) {
-          throw new WireException('Unable to unistall module as the ' . $rm_tmplt->name .' template is in use');
-      } else {
-          wire('templates')->delete($rm_tmplt);
-          wire('fieldgroups')->delete($rm_fldgrp);
+      $selector = 'name=' . $pg;
+      $curr_p = $this->pages->findOne($selector);
+      if($curr_p->id){
+        if($curr_p->numChildren()) {
+          return false;
         }
-      return true;
+      }
     }
-    return false;
+    return true;
   }
 /**
  * Make a field
@@ -562,12 +455,13 @@ class ProcessOrderPages extends Process {
  *
  */
   protected function makeTemplate($key, $spec) {
+
     $fg = new Fieldgroup();
     $fg->name = str_replace('t_', 'fg_', $this[$key]);
     $fg->add($this->fields->get('title'));
     if($key === 't_line-item') {
-      foreach ($spec['t_fields'] as $key) {
-        $fg->add($this[$key]); // From config
+      foreach ($spec['t_fields'] as $fkey) {
+        $fg->add($this[$fkey]); // From config
       }
     }
 
