@@ -50,7 +50,7 @@ class ProcessOrderPages extends Process {
  */
   public function addToCart($item) {
     if( ! $this->ready) {
-      $this->completeInstallation();
+      $this->completeInstallation($item);
     }
 
     $sku = $this->sanitizer->text($item->sku);
@@ -83,8 +83,6 @@ class ProcessOrderPages extends Process {
       $item_data[$this['f_customer']] = $user_id;
       $item_data[$this['f_sku_ref']] = $sku;
       $item_data[$this['f_quantity']] = $quantity;
-
-      bd($item_data);
 
       $cart_item = $this->wire('pages')->add($this['t_line-item'],  '/processwire/orders/cart-items', $item_data);
     }
@@ -205,7 +203,7 @@ class ProcessOrderPages extends Process {
  * @return   Object The new field
  *
  */
-  public function completeInstallation() {
+  public function completeInstallation($item) {
 
     // Not including the sku field - it's up to the user to create and add to their products
 
@@ -227,37 +225,83 @@ class ProcessOrderPages extends Process {
       'p_completed-orders'  =>  array('template' => 't_step', 'parent'=>'/processwire/orders/', 'title'=>'Completed Orders', )
     );
 
-    foreach ($required_fields as $key => $spec) {
-      $this->makeField($key, $spec);
-    }
-    foreach ($required_templates as $key => $spec) {
-      $this->makeTemplate($key, $spec);
-    }
-    foreach ($required_pages as $key => $spec) {
-      $this->makePage($key, $spec);
-    }
+    $safeToInstall = $this->preflightInstall(array('fields' => $required_fields, 'templates' => $required_templates));
+    
+    // Handle errors or proceed
+    if($safeToInstall !== true) {
+      wire('log')->save('order-pages-debug', __LINE__);
+       wire('log')->save('order-pages-debug', print_r($safeToInstall, true));
 
-    // Add display_name field to user template
-    $f = new Field();
-    $f->type = $this->modules->get('FieldtypeText');
-    $f->name = $this['f_display_name'];
-    $f->label = 'Name displayed on orders';
-    $f->save();
-    $usr_template = $this->templates->get('user');
-    $ufg = $usr_template->fieldgroup;
-    $ufg->add($f);
-    $ufg->save();
+      // The addToCart() operation that called this method will fail. Send an email to notify superusers
 
-    // Set initial value of this field to user name 
-    foreach ($this->users->find("start=0") as $u) {
-        $u->of(false);
-        $u->set($this['f_display_name'], $u->name);
-        $u->save();
+      $recipients = array();
+      $superusers = $this->users->get("roles=superuser");
+      foreach ($superusers as $sprusr) {
+        $recipients[] = $sprusr->email;
+      }
+      $pa_email = "paul@primitive.co";
+      $from = "Paul Ashby <{$pa_email}>";
+      $subject = "Paperbird order cart issue";
+      $user_id = $this->users->getCurrentUser()->id;
+      $sku = $this->sanitizer->text($item->sku);
+      $quantity = $this->sanitizer->int($item->quantity);
+      $body_html = "<html><body><h1>Item could not be added to cart</h1><p>User '{$user_id}' attempted to add an item to their cart, but this operation could not be completed as the ProcessOrderPages module is misconfigured.</p><p>Please use the module's settings page to enter unique field and template names.</p><h2>Details of the cart item are as follows:</h2><dl><dt>SKU</dt><dd>{$sku}</dd><dt>Quantity</dt><dd>{$quantity}</dd></dl></body></html>";
+      $options = array("bodyHTML"=>$body_html, 'replyTo'=>$pa_email);
+
+      $this->mail->send($recipients, $from, $subject, $options);
+
+      //TODO: Test email remotely to check that email notification gets sent - for both the cart details (above) and the WireException (below)
+
+      // Process errors
+      $errs = $safeToInstall;
+
+      $err_mssg = 'The ProcessOrderPages module has been configured with non-unique names. Please use its settings page to provide new names for the following: ';
+
+      if(count($errs['fields'])) {
+        $err_mssg .= implode(' field, ', $errs['fields']);
+        $err_mssg .= ' field. ';
+      }
+      if(count($errs['templates'])) {
+        $err_mssg .= implode(' template, ', $errs['templates']);
+        $err_mssg .= ' template. ';
+      }
+      throw new WireException($err_mssg);
+
+    } else {
+
+      foreach ($required_fields as $key => $spec) {
+        $this->makeField($key, $spec);
+      }
+      foreach ($required_templates as $key => $spec) {
+        $this->makeTemplate($key, $spec);
+      }
+      foreach ($required_pages as $key => $spec) {
+        $this->makePage($key, $spec);
+      }
+
+      // Add display_name field to user template
+      $f = new Field();
+      $f->type = $this->modules->get('FieldtypeText');
+      $f->name = $this['f_display_name'];
+      $f->label = 'Name displayed on orders';
+      $f->save();
+      $usr_template = $this->templates->get('user');
+      $ufg = $usr_template->fieldgroup;
+      $ufg->add($f);
+      $ufg->save();
+
+      // Set initial value of this field to user name 
+      foreach ($this->users->find("start=0") as $u) {
+          $u->of(false);
+          $u->set($this['f_display_name'], $u->name);
+          $u->save();
+      }
+
+      $data = $this->modules->getConfig('ProcessOrderPages');
+      $data['ready'] = 'true';
+      $this->modules->saveConfig('ProcessOrderPages', $data);
+
     }
-
-    $data = $this->modules->getConfig('ProcessOrderPages');
-    $data['ready'] = 'true';
-    $this->modules->saveConfig('ProcessOrderPages', $data);
   }  
   public function ___uninstall() {
 
@@ -383,6 +427,39 @@ class ProcessOrderPages extends Process {
     $data['order_num'] = $this->sanitizer->text($order_num);
     $this->modules->saveConfig('ProcessOrderPages', $data);
     return $data['order_num'];
+  }
+
+/**
+ * Check there are no naming collisions before completing installation
+ *
+ * @param   Array $module_elmts Array of elements to check ['fields' Array of Strings , 'templates' Array of Strings]
+ * @return  Array of errors or Boolean true
+ */
+  protected function preflightInstall($module_elmts) {
+
+    $errors = array(
+      'fields' => array(),
+      'templates' => array()
+    );
+
+    // Check if fields exist
+    foreach($module_elmts['fields'] as $f => $spec) {
+      $curr_f = wire('fields')->get($this[$f]);
+      if($curr_f !== null) {
+        $errors['fields'][] = $this[$f];
+      }
+    }
+
+    foreach ($module_elmts['templates'] as $t => $spec) {
+      $curr_t = $this->templates->get($this[$t]);
+      if( $curr_t !== null) {
+        $errors['templates'][] = $this[$t];
+      }
+    }
+    if(count($errors['fields']) || count($errors['templates'])) {
+      return $errors;
+    }
+    return true;
   }
 /**
  * Check it's safe to delete provided items
