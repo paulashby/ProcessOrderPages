@@ -10,12 +10,20 @@
 
 $config = array(
 	
-	'prefixMessage' => array(
+	'adminEmail' => array(
+		'name'=> 'order_admin_email',
+		'type' => 'email', 
+		'label' => 'Order admin email',
+		'description' => 'Used to send order confirmations and receive new order notifications.', 
+		'value' => '', 
+		'required' => true 
+	),
+	'orderNumber' => array(
 		'name'=> 'order_num',
 		'type' => 'text', 
 		'label' => 'Next order',
 		'description' => 'Please Enter the order number you would like to start from', 
-		'value' => '1000', 
+		'value' => '', 
 		'required' => true 
 	),
 	'skuField' => array(
