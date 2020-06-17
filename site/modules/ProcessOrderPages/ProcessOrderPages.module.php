@@ -40,13 +40,11 @@ class ProcessOrderPages extends Process {
       $event->return = str_replace(array('uk-margin-top', 'ui-button'), array('', 'ui-button ui-button' . $class_suffix), $return);
     });
   }
-
 /**
  * Add product to cart (creates a line-item page as child of /processwire/orders/cart-items)
  *
- * @param    string $item The submitted form
- * @return   string The configured field name
- *
+ * @param string $item The submitted form
+ * @return string The configured field name
  */
   public function addToCart($item) {
     if( ! $this->ready) {
@@ -189,12 +187,13 @@ class ProcessOrderPages extends Process {
   public function ___execute() {
     // Live version
   }
-
+///TODO: Is there a better way to call this function? We really need it in place before an item is added to the cart
 /**
- * Create all fields, templates and pages required by the module
+ * Create all fields, templates and pages required by the module - 
+ *   also emails superusers if installation has failed
  *
- * @return   Object The new field
- *
+ * @param string $item The submitted form
+ * @return object The new field
  */
   public function completeInstallation($item) {
 
@@ -346,15 +345,21 @@ class ProcessOrderPages extends Process {
   }
 
 ///////
+/**
+ * Convert an integer representing GB pence to a GBP string 
+ *
+ * @param int $pence
+ * @return string GBP value as a string with decimal point and prepended £
+ */
+public function formatPrice($pence) {
 
+}
 /**
  * Change quantity of cart item
  *
- * @param    string  $sku The item to update
- * @param    string  $qty The new value
- * @return   Json
- *
- *
+ * @param string  $sku The item to update
+ * @param string  $qty The new value
+ * @return Json
  */
   public function changeQuantity($sku, $qty) {
 
@@ -380,9 +385,7 @@ class ProcessOrderPages extends Process {
 /**
  * Get order number
  *
- * @return   string The next free order number
- *
- *
+ * @return  string The next free order number
  */
   protected function getOrderNum() {
 
@@ -393,10 +396,8 @@ class ProcessOrderPages extends Process {
 /**
  * Set order number
  *
- * @param    string  $val The number to base new orders on
- * @return   boolean
- *
- *
+ * @param string  $val The number to base new orders on
+ * @return boolean
  */
   protected function setOrderNum($val) {
 
@@ -408,9 +409,7 @@ class ProcessOrderPages extends Process {
 /**
  * Increment order number
  *
- * @return   string The new order number
- *
- *
+ * @return string The new order number
  */
   protected function incrementOrderNum() {
 
@@ -425,8 +424,8 @@ class ProcessOrderPages extends Process {
 /**
  * Check there are no naming collisions before completing installation
  *
- * @param   Array $module_elmts Array of elements to check ['fields' Array of Strings , 'templates' Array of Strings]
- * @return  Array of errors or Boolean true
+ * @param array $module_elmts Array of elements to check ['fields' Array of strings , 'templates' Array of strings]
+ * @return array of errors or boolean true
  */
   protected function preflightInstall($module_elmts) {
 
@@ -457,8 +456,8 @@ class ProcessOrderPages extends Process {
 /**
  * Check it's safe to delete provided items
  *
- * @param   Array $ps Names of pages to check
- * @return  Boolean
+ * @param array $ps Names of pages to check
+ * @return boolean
  */
   protected function preflightUninstall($ps) {
 
@@ -477,11 +476,9 @@ class ProcessOrderPages extends Process {
 /**
  * Make a field
  *
- * @param    string $key Name of field
- * @param    array $spec [string 'fieldtype', string 'label']
- * @return   Object The new field
- *
- *
+ * @param string $key Name of field
+ * @param array $spec [string 'fieldtype', string 'label']
+ * @return object The new field
  */
   protected function makeField($key, $spec) {
     $f = new Field();
@@ -494,11 +491,9 @@ class ProcessOrderPages extends Process {
 /**
  * Make a template
  *
- * @param    string $key Name of template with 'p_' prepended
- * @param    array $spec [array $t_parents [string Template name], array $t_children [string Template name], $array T_field $array [string Field name]]
- * @return   Object The new template
- *
- *
+ * @param string $key Name of template with 'p_' prepended
+ * @param array $spec [array $t_parents [string Template name], array $t_children [string Template name], $array T_field $array [string Field name]]
+ * @return object The new template
  */
   protected function makeTemplate($key, $spec) {
 
@@ -537,11 +532,9 @@ class ProcessOrderPages extends Process {
 /**
  * Create a new page
  *
- * @param    string $key Name of page
- * @param    array $spec [string 'template' - name of template, string 'parent' - path of parent page, string 'title']
- * @return   Object The new page
- *
- *
+ * @param string $key Name of page
+ * @param array $spec [string 'template' - name of template, string 'parent' - path of parent page, string 'title']
+ * @return Object The new page
  */
   protected function makePage($key, $spec) {
     $p = $this->wire(new Page());
@@ -556,10 +549,8 @@ class ProcessOrderPages extends Process {
 /**
  * Make a template selector string
  *
- * @param    string $relation to current template
- * @return   string The selctor string
- *
- *
+ * @param string $relation to current template
+ * @return string The selector string
  */
   protected function getFamilySelector($relation) {
     $t_selector = 'name=';
