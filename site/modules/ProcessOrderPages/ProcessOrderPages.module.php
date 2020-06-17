@@ -88,17 +88,7 @@ class ProcessOrderPages extends Process {
     }
     return json_encode(Array("success"=>true));
   }
-/**
- * Get name submitted in config
- *
- * @param    string name of configuration field
- * @return   string The configured field name
- *
- */
-  public function getName($req) {
-    return $this[$req];
-  }
-  public function ___execute() {
+  public function ___executeOld() {
     
     $feedback = '';
 
@@ -195,6 +185,9 @@ class ProcessOrderPages extends Process {
     $out .= '<p><a href="./mysecondpage" class="ui-button ui-state-default">Go to Page 2</a></p>';
     
     return $out;
+  }
+  public function ___execute() {
+    // Live version
   }
 
 /**

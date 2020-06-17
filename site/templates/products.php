@@ -1,7 +1,7 @@
 <?php namespace ProcessWire;
 
 $cart = $modules->get("ProcessOrderPages");
-$sku_field = $cart->getName('f_sku');
+$sku_field = $cart['f_sku'];
 
 // Process 'add to cart' requests
 if($input->post->submit) {
