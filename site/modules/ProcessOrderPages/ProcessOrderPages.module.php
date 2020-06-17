@@ -355,6 +355,22 @@ public function formatPrice($pence) {
 
 }
 /**
+ * Remove line item from cart
+ *
+ * @param string  $sku The item to remove
+ * @return Json Updated cart markup if successful
+ */
+public function removeCartItem($sku) {
+
+  $cart_item = $this->getCartItem($sku);
+
+    if($cart_item->id) {
+        $cart_item->delete();
+        return json_encode(array('success'=>true, 'cart'=>$this->renderCart()));  
+    }
+    return json_encode(array('error'=>'The item could not be found'));
+  }
+/**
  * Change quantity of cart item
  *
  * @param string  $sku The item to update
@@ -363,9 +379,75 @@ public function formatPrice($pence) {
  */
   public function changeQuantity($sku, $qty) {
 
-    $skus = $this->sanitizer->text($sku);
+    $cart_item = $this->getCartItem($sku);
     $qtys = $this->sanitizer->text($qty);
 
+    if($cart_item->id) {
+        $cart_item->of(false);
+        $cart_item->set($this['f_quantity'], (int)$qtys);
+        $cart_item->save();
+        return json_encode(array('success'=>true));  
+    }
+    return json_encode(array('error'=>'The item could not be found'));
+  }
+/**
+ * Generate HTML markup for current user's cart
+ *
+ * @return string HTML markup
+ */
+  public function renderCart() {
+
+    $user_id = $this->users->getCurrentUser()->id;
+    $line_item_template = $this['t_line-item'];
+    $customer = $this['f_customer'];
+
+    // Store field and template names in variables for markup
+    $f_sku = $this['f_sku'];
+    $f_sku_ref = $this['f_sku_ref'];
+    $f_quantity = $this['f_quantity'];
+    $t_line_item = $this['t_line-item'];
+
+    $cart_items = $this->pages->find("template={$t_line_item}, {$customer}={$user_id}");
+
+    $render = "<div class='cart-items'>
+    <form action='' method='post'>";
+    // cart_items are line_items NOT product pages
+    foreach ($cart_items as $item => $data) {
+
+      $sku_ref = $data[$f_sku_ref];
+      $product_selector = "template=product, {$f_sku}={$sku_ref}";
+      $product = $this->pages->findOne($product_selector);
+      $price = $product->price;
+      $quantity = $data[$f_quantity];
+
+
+      $render .= "<fieldset>
+      <legend>" . $product->title . "</legend>";
+      
+      // Added <p> text to debug submitted form - as we're submitting inputs as arrays - name='quantity[]' etc - NOTE this <p> will only update when the page is reloaded as the quantity change is an ajax call and I'm not going to bother updating a value I'm only going to remove later
+      $render .= "<p>SKU: {$sku_ref}. Quantity: {$quantity}. Price: {$price}</p>
+        <label for='quantity'>Quantity (Packs of 6):</label>
+        <input type='number' data-action='qtychange' data-sku='{$sku_ref}' name='quantity[]' min='1' step='1' value='{$quantity}'>
+        <input type='hidden' name='sku[]' value='{$sku_ref}'>
+        <input type='hidden' name='price[]' value='{$price}'>
+        <a role='button' data-action='remove' data-sku='{$sku_ref}'>Remove</a>
+      </fieldset>";
+    }
+    $render .= " <input type='submit' name='submit' value='submit'>
+      </form>
+    </div>";
+
+    return $render;
+  }
+/**
+ * Get item from cart
+ *
+ * @param string  $sku The item to get
+ * @return object Line item page or boolean false
+ */
+  protected function getCartItem($sku) {
+
+    $skus = $this->sanitizer->text($sku);
     $user_id = $this->users->getCurrentUser()->id;
     $template_name = $this['t_line-item'];
     $customer_field_name = $this['f_customer'];
@@ -375,12 +457,9 @@ public function formatPrice($pence) {
     $cart_item = $this->pages->findOne($selector);
 
     if($cart_item->id) {
-        $cart_item->of(false);
-        $cart_item->set($pre . 'quantity', (int)$qtys);
-        $cart_item->save();
-        return json_encode(array('success'=>true));  
+      return $cart_item;
     }
-    return json_encode(array('error'=>'The item could not be found'));
+    return false;
   }
 /**
  * Get order number

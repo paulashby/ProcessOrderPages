@@ -4,11 +4,15 @@ var Checkout = (function () {
 
     var setup = {
 	    success_callbacks : {
-	        submit: function (e) {
+	        submit: function (e, data) {
 	        	//TODO: Provide success feedback
 	        },
-	        qtychange: function (e) {
+	        qtychange: function (e, data) {
 	        	//TODO: Provide success feedback
+	        },
+	        remove: function (e, data) {
+	        	//TODO: Provide success feedback
+	        	$('.cart-items').replaceWith(data.cart);
 	        }
 	    }
 	};
@@ -53,6 +57,23 @@ var Checkout = (function () {
 
 	        // Let jQuery submit the form
 	        e.preventDefault();
+	    };
+
+	    actions.remove = function (e) {
+
+			var sku = $(e.target).data('sku');
+			var options = {
+            	ajaxdata: {
+            		remove: true,
+            		sku: sku
+            	},  
+            	role: 'remove', // Set this to run callback
+            	event: e // Possibly needed for callbacks
+	        };
+	        doAction(options);
+
+	        // Let jQuery submit the form
+	        e.preventDefault();
 	    }
 	});
 
@@ -66,7 +87,7 @@ var Checkout = (function () {
                 if(data.success === true) {
 
                     // Different callbacks will probably require different arguments
-                    setup.success_callbacks[options.role](options.event);
+                    setup.success_callbacks[options.role](options.event, data);
 
                 } else {
                 	// TODO: Add an error_report element to populate
