@@ -51,9 +51,9 @@ $config->useFunctionsAPI = true;
  * 
  */
 $config->dbHost = 'localhost';
-$config->dbName = 'orderpages1606';
-$config->dbUser = 'orderpages1606';
-$config->dbPass = 'CNJD8QWqtPFuxiVJ';
+$config->dbName = 'pw_orderpg_180620';
+$config->dbUser = 'pw_orderpg_180620';
+$config->dbPass = 'Gvw8FIGuYBlyjIo7';
 $config->dbPort = '3306';
 
 /**
@@ -62,7 +62,7 @@ $config->dbPort = '3306';
  * Must be retained if you migrate your site from one server to another
  * 
  */
-$config->userAuthSalt = '937959f17569e306f9f87b08e3ab0ece'; 
+$config->userAuthSalt = '5c1b250a8eeb633b3a4441f9bba94f2a'; 
 
 /**
  * Installer: File Permission Configuration
@@ -90,7 +90,7 @@ $config->defaultAdminTheme = 'AdminThemeUikit';
  * Please leave this value as-is.
  * 
  */
-$config->installed = 1592301024;
+$config->installed = 1592484052;
 
 
 /**
@@ -108,5 +108,5 @@ $config->httpHosts = array('www.order-pages.io', 'order-pages.io');
  * Should be true for development sites and false for live/production sites. 
  * 
  */
-$config->debug = false;
+$config->debug = true;
 

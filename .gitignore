@@ -6,6 +6,7 @@ LICENSE.TXT
 .DS_Store
 .htaccess
 htaccess.txt
+site/config.php
 /site/assets/*
 /site/modules/README.txt
 /site/modules/TracyDebugger/*
@@ -14,3 +15,4 @@ htaccess.txt
 /site/modules/InputfieldCKEditor/*
 /site/modules/ProcessOrderPages/Notes.txt
 site/modules/ProcessExportProfile-master/*
+
