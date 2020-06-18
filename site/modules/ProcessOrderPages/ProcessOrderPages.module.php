@@ -80,7 +80,7 @@ class ProcessOrderPages extends Process {
 
       $cart_item = $this->wire('pages')->add($this['t_line-item'],  '/processwire/orders/cart-items', $item_data);
     }
-    return json_encode(Array("success"=>true));
+    return json_encode(array("success"=>true));
   }
   public function ___executeOld() {
     
@@ -208,10 +208,10 @@ class ProcessOrderPages extends Process {
       't_step'              => array('t_parents' => array('admin'), 't_children' => array('t_order')),
     );
     $required_pages = array(
-      'p_cart-items'        =>  array('template' => 't_cart-item', 'parent'=>'/processwire/orders/', 'title'=>'Cart Items'),
-      'p_pending-orders'    =>  array('template' => 't_step', 'parent'=>'/processwire/orders/', 'title'=>'Pending Orders', ),
-      'p_active-orders'     =>  array('template' => 't_step', 'parent'=>'/processwire/orders/', 'title'=>'Active Orders', ),
-      'p_completed-orders'  =>  array('template' => 't_step', 'parent'=>'/processwire/orders/', 'title'=>'Completed Orders', )
+      'cart-items'        =>  array('template' => 't_cart-item', 'parent'=>'/processwire/orders/', 'title'=>'Cart Items'),
+      'pending-orders'    =>  array('template' => 't_step', 'parent'=>'/processwire/orders/', 'title'=>'Pending Orders', ),
+      'active-orders'     =>  array('template' => 't_step', 'parent'=>'/processwire/orders/', 'title'=>'Active Orders', ),
+      'completed-orders'  =>  array('template' => 't_step', 'parent'=>'/processwire/orders/', 'title'=>'Completed Orders', )
     );
 
     $safeToInstall = $this->preflightInstall(array('fields' => $required_fields, 'templates' => $required_templates));
@@ -228,7 +228,7 @@ class ProcessOrderPages extends Process {
       foreach ($superusers as $sprusr) {
         $recipients[] = $sprusr->email;
       }
-      $pa_email = 'paul@primitive.co;'
+      $pa_email = 'paul@primitive.co';
       $from = 'Paul Ashby <{$pa_email}>';
       $subject = 'Paperbird order cart issue';
       $user_id = $this->users->getCurrentUser()->id;
@@ -346,21 +346,57 @@ class ProcessOrderPages extends Process {
 /**
  * Process line items, creating new order in /processwire/orders/pending-orders/
  *
- * @param string  $array The item to remove
  * @return Json
  */
   public function placeOrder() {
-    
-    foreach ($cart_items as $item) {
 
-          // Make a new order page first, then add these to that
-          // order template may need more info actually - 
-          // don't we need to add the user so we can easily get orders for current customer?
-      
-          // $item->of(false);
-          // $item->parent = $pages->get('name=pending-orders');
-          // $item->save();
+    // Get the parent page for the new order
+    $errors = array();
+
+    $orders_parent = $this->getOrdersPage('pending');
+    if( ! $orders_parent) {
+      $errors[] = "The orders page could not be found";
     }
+    $o_name = $this['t_order'];
+
+    if(! $o_name) {
+      $errors[] = "The order template could not be identified";
+      return json_encode(array("errors"=>$errors));
+    }
+    $order_number = $this->getOrderNum();
+
+    // Create the order
+    $order_page = $this-> makePage($order_number, array('template' => 't_order', 'parent'=>$orders_parent->path(), 'title'=>$order_number));
+    $cart_items = $this->getCartItems();
+
+    foreach ($cart_items as $item) {
+      $item->of(false);
+      $item->parent = $order_page;
+      $item->save();
+    }
+    return json_encode(array("success"=>true));
+  }
+/**
+ * Get parent page for order
+ *
+ * @param string $order_step
+ * @return page or boolean false
+ */
+  protected function getOrdersPage($order_step) {
+    $user_id = $this->users->getCurrentUser()->id;
+    $pg_name = $user_id . "_orders";
+    $admin_url = $this->config->url('admin');
+    $order_path = "{$admin_url}orders/{$order_step}-orders/";
+    $selector = "has_parent={$order_path}, name={ $pg_name}";
+    $user_order_page = $this->pages->findOne($selector);
+    $errors = array();
+
+    if( ! $user_order_page->id) {
+      // No orders for this user - make a new page within pending orders
+      
+      $user_order_page = $this->makePage($pg_name, array('template' => 't_userorders', 'parent'=>$order_path, 'title'=>$pg_name));
+    }
+    return $user_order_page;
   }
 /**
  * Remove line item from cart
@@ -487,14 +523,19 @@ class ProcessOrderPages extends Process {
     return $this->pages->find("has_parent={$admin_url}orders/cart-items/, template={$t_line_item}, {$f_customer}={$user_id}");
   }
 /**
- * Get order number
+ * Get order number then increment in db
  *
- * @return  string The next free order number
+ * @return  string The unincremented order number
  */
   protected function getOrderNum() {
 
     $data = $this->modules->getConfig('ProcessOrderPages');
-    return $data['order_num'];
+    $order_num = $this->sanitizer->text($data['order_num']);
+    $this_order_num = $order_num;
+    $order_num++;
+    $data['order_num'] = $this->sanitizer->text($order_num);
+    $this->modules->saveConfig('ProcessOrderPages', $data);
+    return $this_order_num;
   }
 
 /**
@@ -682,7 +723,7 @@ class ProcessOrderPages extends Process {
     $p = $this->wire(new Page());
     $p->template = $this[$spec['template']];
     $p->parent = wire('pages')->get($spec['parent']);
-    $p->name = str_replace('p_', '', $key); // Name used in url - we're not allowing custom page names in config
+    $p->name = $key; // Name used in url
     $p->title = $spec['title'];
     $p->save();
 

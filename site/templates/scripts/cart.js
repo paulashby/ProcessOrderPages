@@ -1,4 +1,4 @@
-var Checkout = (function () {
+var Cart = (function () {
 
     'use strict';
 
