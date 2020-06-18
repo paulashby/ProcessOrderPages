@@ -107,10 +107,10 @@ class ProcessOrderPages extends Process {
         
         if($operation === 'Processed') {
           $order_num = $this->sanitizer->text($this->input->post['processed-order']);
-          $feedback = '<h1>Processed - should change '. $order_num . ' to completed</h1>';
+          $feedback = "<h1>Processed - should change {$order_num} to completed</h1>";
         } else if ($operation === 'Completed') {
           $order_num = $this->sanitizer->text($this->input->post['completed-order']);
-          $feedback = '<h1>Completed - should move ' . $order_num . ' to completed orders</h1>';
+          $feedback = "<h1>Completed - should move {$order_num} to completed orders</h1>";
         }
       }
     }
@@ -130,8 +130,8 @@ class ProcessOrderPages extends Process {
     $order_number = 100234;
 
     $form = $this->modules->get('InputfieldForm');
-    $form->action = "./";
-    $form->method = "post";
+    $form->action = './';
+    $form->method = 'post';
 
     // This attribute sets state of button - value is either 'processed-form' or 'completed-form'
     /*
@@ -139,9 +139,9 @@ class ProcessOrderPages extends Process {
 
       Orders 
     */
-    $form->attr("id+name",'processed-form');
+    $form->attr('id+name','processed-form');
 
-    $field = $this->modules->get("InputfieldHidden");
+    $field = $this->modules->get('InputfieldHidden');
     $field->attr('id+name','processed-order');
     $field->set('value', $order_number);
     $form->add($field);
@@ -152,18 +152,18 @@ class ProcessOrderPages extends Process {
 
     $table = $this->modules->get('MarkupAdminDataTable');
     $table->setEncodeEntities(false);
-    $table->headerRow(['Order Number', 'Product', "Packs", "Total", 'Customer', 'Status']);
+    $table->headerRow(['Order Number', 'Product', 'Packs', 'Total', 'Customer', 'Status']);
 
-    $table->row([$order_number, '<ul class="order-details"><li><span class="order-details__sku">FL180</span> Another Fine Nest You&apos;ve Got Me Into</li><li><span class="order-details__sku">699</span> A Flower for You</li></ul>', '<ul class="order-details"><li>2</li><li>4</li></ul>', '£16.00','Medi Gifts & Homestyle',  $form->render()]);
+    $table->row([$order_number, "<ul class='order-details'><li><span class='order-details__sku'>FL180</span> Another Fine Nest You&apos;ve Got Me Into</li><li><span class='order-details__sku'>699</span> A Flower for You</li></ul>", "<ul class='order-details'><li>2</li><li>4</li></ul>", "£16.00", "Medi Gifts & Homestyle",  $form->render()]);
 
     $order_number = 100235;
 
     $form = $this->modules->get('InputfieldForm');
-    $form->action = "./";
-    $form->method = "post";
-    $form->attr("id+name",'completed-form');
+    $form->action = './';
+    $form->method = 'post';
+    $form->attr('id+name','completed-form');
 
-    $field = $this->modules->get("InputfieldHidden");
+    $field = $this->modules->get('InputfieldHidden');
     $field->attr('id+name','completed-order');
     $field->set('value', $order_number);
     $form->add($field);
@@ -172,11 +172,11 @@ class ProcessOrderPages extends Process {
     $button->value = 'Completed';
     $form->add($button);
 
-    $table->row([$order_number, '<ul class="order-details"><li><span class="order-details__sku">NC706</span> Chrysanthemum</li></ul>', '<ul class="order-details"><li>2</li></ul>', '£3.50', 'Athena',  $form->render()]);
+    $table->row([$order_number, "<ul class='order-details'><li><span class='order-details__sku'>NC706</span> Chrysanthemum</li></ul>", "<ul class='order-details'><li>2</li></ul>", '£3.50', 'Athena',  $form->render()]);
 
     $out .= $table->render();
 
-    $out .= '<p><a href="./mysecondpage" class="ui-button ui-state-default">Go to Page 2</a></p>';
+    $out .= "<p><a href='./mysecondpage' class='ui-button ui-state-default'>Go to Page 2</a></p>";
     
     return $out;
   }
@@ -204,6 +204,7 @@ class ProcessOrderPages extends Process {
       't_line-item'         => array('t_parents' => array('t_cart-item', 't_order'), 't_fields'=>array('f_customer', 'f_sku_ref', 'f_quantity')),
       't_cart-item'         => array('t_parents' => array('admin'), 't_children' => array('t_line-item')),
       't_order'             => array('t_parents' => array('t_step'), 't_children' => array('t_line-item')),
+      't_userorders'        => array('t_parents' => array('t_order'), 't_children' => array('t_order')),
       't_step'              => array('t_parents' => array('admin'), 't_children' => array('t_order')),
     );
     $required_pages = array(
@@ -223,18 +224,18 @@ class ProcessOrderPages extends Process {
       // The addToCart() operation that called this method will fail. Send an email to notify superusers
 
       $recipients = array();
-      $superusers = $this->users->get("roles=superuser");
+      $superusers = $this->users->get('roles=superuser');
       foreach ($superusers as $sprusr) {
         $recipients[] = $sprusr->email;
       }
-      $pa_email = "paul@primitive.co";
-      $from = "Paul Ashby <{$pa_email}>";
-      $subject = "Paperbird order cart issue";
+      $pa_email = 'paul@primitive.co;'
+      $from = 'Paul Ashby <{$pa_email}>';
+      $subject = 'Paperbird order cart issue';
       $user_id = $this->users->getCurrentUser()->id;
       $sku = $this->sanitizer->text($item->sku);
       $quantity = $this->sanitizer->int($item->quantity);
       $body_html = "<html><body><h1>Item could not be added to cart</h1><p>User '{$user_id}' attempted to add an item to their cart, but this operation could not be completed as the ProcessOrderPages module is misconfigured.</p><p>Please use the module's settings page to enter unique field and template names.</p><h2>Details of the cart item are as follows:</h2><dl><dt>SKU</dt><dd>{$sku}</dd><dt>Quantity</dt><dd>{$quantity}</dd></dl></body></html>";
-      $options = array("bodyHTML"=>$body_html, 'replyTo'=>$pa_email);
+      $options = array('bodyHTML'=>$body_html, 'replyTo'=>$pa_email);
 
       $this->mail->send($recipients, $from, $subject, $options);
 
@@ -243,7 +244,7 @@ class ProcessOrderPages extends Process {
       // Process errors
       $errs = $safeToInstall;
 
-      $err_mssg = 'The ProcessOrderPages module has been configured with non-unique names. Please use its settings page to provide new names for the following: ';
+      $err_mssg = "The ProcessOrderPages module has been configured with non-unique names. Please use its settings page to provide new names for the following: ";
 
       if(count($errs['fields'])) {
         $err_mssg .= implode(' field, ', $errs['fields']);
@@ -262,6 +263,9 @@ class ProcessOrderPages extends Process {
       }
       foreach ($required_templates as $key => $spec) {
         $this->makeTemplate($key, $spec);
+      }
+      foreach ($required_templates as $key => $spec) {
+        $this->setTemplateFamily($key, $spec);
       }
       foreach ($required_pages as $key => $spec) {
         $this->makePage($key, $spec);
@@ -336,7 +340,7 @@ class ProcessOrderPages extends Process {
       parent::___uninstall();
 
     } else {
-      throw new WireException('Unable to uninstall module as there are orders in progress. You can permanently delete this data from the /processwire/orders page, then try again');
+      throw new WireException("Unable to uninstall module as there are orders in progress. You can permanently delete this data from the /processwire/orders page, then try again");
     }
   }
 /**
@@ -371,7 +375,7 @@ class ProcessOrderPages extends Process {
         $cart_item->delete();
         return json_encode(array('success'=>true, 'cart'=>$this->renderCart()));  
     }
-    return json_encode(array('error'=>'The item could not be found'));
+    return json_encode(array('error'=>"The item could not be found"));
   }
 /**
  * Change quantity of cart item
@@ -391,7 +395,7 @@ class ProcessOrderPages extends Process {
         $cart_item->save();
         return json_encode(array('success'=>true));  
     }
-    return json_encode(array('error'=>'The item could not be found'));
+    return json_encode(array('error'=>"The item could not be found"));
   }
 /**
  * Convert an integer representing GB pence to a GBP string 
@@ -591,7 +595,7 @@ class ProcessOrderPages extends Process {
 /**
  * Make a template
  *
- * @param string $key Name of template with 'p_' prepended
+ * @param string $key name of config input field
  * @param array $spec [array $t_parents [string Template name], array $t_children [string Template name], $array T_field $array [string Field name]]
  * @return object The new template
  */
@@ -599,7 +603,7 @@ class ProcessOrderPages extends Process {
 
     $fg_name = $this[$key]; // From config
     if(! $fg_name) {
-      throw new WireException(__LINE__ . ': Unable to create fieldgroup as name was not provided');
+      throw new WireException(__LINE__ . ": Unable to create fieldgroup as name was not provided");
     }
     $fg = new Fieldgroup();
     $fg->name = str_replace('t_', 'fg_', $fg_name);
@@ -608,7 +612,7 @@ class ProcessOrderPages extends Process {
       foreach ($spec['t_fields'] as $fkey) {
         $f_name = $this[$fkey]; // From config
         if(! $f_name) {
-          throw new WireException(__LINE__ . ': Unable to add field as name was not provided');
+          throw new WireException(__LINE__ . ": Unable to add field as name was not provided");
         }
         $fg->add($f_name);
       }
@@ -618,32 +622,55 @@ class ProcessOrderPages extends Process {
 
     $t_name = $this[$key];
     if(! $t_name) {
-      throw new WireException(__LINE__ . ': Unable to create fieldgroup as name was not provided');
+      throw new WireException(__LINE__ . ": Unable to create template as name was not provided");
     }
     $t = new Template();
     $t->name = $t_name;
     $t->fieldgroup = $fg;
     $t->save();
-
-    if(array_key_exists('t_parents', $spec)) {
-      // Set permitted parent templates
-      $p_selector = $this->getFamilySelector($spec['t_parents']);
-      // $t->parentTemplates = $this->templates->find($f_selector);
-      $parent_templates = $this->templates->find($p_selector);
-      $t->parentTemplates($parent_templates);
-    }
-
-    if(array_key_exists('t_children', $spec)) {
-      // Set permitted child templates
-      $c_selector = $this->getFamilySelector($spec['t_children']);
-      $child_templates = $this->templates->find($c_selector);
-      $t->childTemplates($child_templates);
-    }
-
-    $t->save();
     return $t;
   }
 
+/**
+ * Make a template
+ *
+ * @param string $key name of config input field
+ * @param array $spec [array $t_parents [string Template name], array $t_children [string Template name], $array T_field $array [string Field name]]
+ * @return boolean
+ */
+  protected function setTemplateFamily($key, $spec) {
+
+    $t_name = $this[$key];
+    if(! $t_name) {
+      $this->error("Unable to set template family", Notice::logOnly);
+      return false;
+    }
+    $t = $this->templates->get($t_name);
+    if(! $t->id) {
+      $this->error("Unable to set family for template {$t_name}", Notice::logOnly);
+      return false;
+    }
+    
+    if(array_key_exists('t_parents', $spec)) {
+      $parent_template_names = array();
+      foreach ($spec['t_parents'] as $key => $input_name) {
+        $parent_template_names[] = $this[$input_name];
+      }
+      // Set permitted parent templates
+      $t->parentTemplates($parent_template_names);
+    }
+
+    if(array_key_exists('t_children', $spec)) {
+      $child_template_names = array();
+      foreach ($spec['t_children'] as $key => $input_name) {
+        $child_template_names[] = $this[$input_name];
+      }
+      // Set permitted parent templates
+      $t->childTemplates($child_template_names);
+    }
+    $t->save();
+    return true;
+  }
 /**
  * Create a new page
  *
@@ -660,19 +687,6 @@ class ProcessOrderPages extends Process {
     $p->save();
 
     return $p;
-  }
-/**
- * Make a template selector string
- *
- * @param string $relation to current template
- * @return string The selector string
- */
-  protected function getFamilySelector($relation) {
-    $t_selector = 'name=';
-    foreach ($relation as $searchkey) {
-      $t_selector .= $searchkey . '|';
-    }
-    return $t_selector;
   }
 
 }
