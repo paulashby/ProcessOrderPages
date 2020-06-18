@@ -53,7 +53,6 @@ class ProcessOrderPages extends Process {
 
     $sku = $this->sanitizer->text($item->sku);
     $quantity = $this->sanitizer->int($item->quantity);
-    $price = $this->sanitizer->int($item->price);
     
     // Is there an existing order for this product?
     $template = $this['t_line-item'];
@@ -74,10 +73,7 @@ class ProcessOrderPages extends Process {
 
       // Create a new item
       $item_title = $sku . ': ' . $this->users->get($user_id)[$this['f_display_name']];
-      $item_data = array(
-        'title' => $item_title,
-        'price' => $price
-      );
+      $item_data = array('title' => $item_title);
       $item_data[$this['f_customer']] = $user_id;
       $item_data[$this['f_sku_ref']] = $sku;
       $item_data[$this['f_quantity']] = $quantity;
@@ -343,26 +339,33 @@ class ProcessOrderPages extends Process {
       throw new WireException('Unable to uninstall module as there are orders in progress. You can permanently delete this data from the /processwire/orders page, then try again');
     }
   }
-
-///////
 /**
- * Convert an integer representing GB pence to a GBP string 
+ * Process line items, creating new order in /processwire/orders/pending-orders/
  *
- * @param int $pence
- * @return string GBP value as a string with decimal point and prepended £
+ * @param string  $array The item to remove
+ * @return Json
  */
-public function formatPrice($pence) {
+  public function placeOrder() {
+    
+    foreach ($cart_items as $item) {
 
-}
+          // Make a new order page first, then add these to that
+          // order template may need more info actually - 
+          // don't we need to add the user so we can easily get orders for current customer?
+      
+          // $item->of(false);
+          // $item->parent = $pages->get('name=pending-orders');
+          // $item->save();
+    }
+  }
 /**
  * Remove line item from cart
  *
  * @param string  $sku The item to remove
  * @return Json Updated cart markup if successful
  */
-public function removeCartItem($sku) {
-
-  $cart_item = $this->getCartItem($sku);
+  public function removeCartItem($sku) {
+    $cart_item = $this->getCartItem($sku);
 
     if($cart_item->id) {
         $cart_item->delete();
@@ -391,49 +394,54 @@ public function removeCartItem($sku) {
     return json_encode(array('error'=>'The item could not be found'));
   }
 /**
+ * Convert an integer representing GB pence to a GBP string 
+ *
+ * @param int $pence
+ * @return string GBP value as a string with decimal point and prepended £
+ */
+  public function renderPrice($pence) {
+
+    return '£' . number_format($pence/100, 2);
+  }
+/**
  * Generate HTML markup for current user's cart
  *
  * @return string HTML markup
  */
   public function renderCart() {
 
-    $user_id = $this->users->getCurrentUser()->id;
-    $line_item_template = $this['t_line-item'];
-    $customer = $this['f_customer'];
-
     // Store field and template names in variables for markup
     $f_sku = $this['f_sku'];
     $f_sku_ref = $this['f_sku_ref'];
     $f_quantity = $this['f_quantity'];
-    $t_line_item = $this['t_line-item'];
 
-    $cart_items = $this->pages->find("template={$t_line_item}, {$customer}={$user_id}");
+    $cart_items = $this->getCartItems();
 
     $render = "<div class='cart-items'>
-    <form action='' method='post'>";
+    <form class='.cart-items__form' action='' method='post'>";
     // cart_items are line_items NOT product pages
     foreach ($cart_items as $item => $data) {
 
       $sku_ref = $data[$f_sku_ref];
       $product_selector = "template=product, {$f_sku}={$sku_ref}";
       $product = $this->pages->findOne($product_selector);
-      $price = $product->price;
+      $price = $this->renderPrice($product->price);
       $quantity = $data[$f_quantity];
+      $subtotal = $this->renderPrice($product->price * $quantity);
 
-
-      $render .= "<fieldset>
+      $render .= "<fieldset class='.form__fieldset'>
       <legend>" . $product->title . "</legend>";
       
       // Added <p> text to debug submitted form - as we're submitting inputs as arrays - name='quantity[]' etc - NOTE this <p> will only update when the page is reloaded as the quantity change is an ajax call and I'm not going to bother updating a value I'm only going to remove later
       $render .= "<p>SKU: {$sku_ref}. Quantity: {$quantity}. Price: {$price}</p>
-        <label for='quantity'>Quantity (Packs of 6):</label>
-        <input type='number' data-action='qtychange' data-sku='{$sku_ref}' name='quantity[]' min='1' step='1' value='{$quantity}'>
+        <label class='.form__label' for='quantity'>Quantity (Packs of 6):</label>
+        <input class='.form__quantity' type='number' data-action='qtychange' data-sku='{$sku_ref}' name='quantity[]' min='1' step='1' value='{$quantity}'>
+        <p class='.form__price'>{$price}</p>
         <input type='hidden' name='sku[]' value='{$sku_ref}'>
-        <input type='hidden' name='price[]' value='{$price}'>
-        <a role='button' data-action='remove' data-sku='{$sku_ref}'>Remove</a>
+        <a class='form__button form__button--cancel' role='button' data-action='remove' data-sku='{$sku_ref}'>Remove</a>
       </fieldset>";
     }
-    $render .= " <input type='submit' name='submit' value='submit'>
+    $render .= "<input class='form__button form__button--submit' type='submit' name='submit' value='submit'>
       </form>
     </div>";
 
@@ -460,6 +468,19 @@ public function removeCartItem($sku) {
       return $cart_item;
     }
     return false;
+  }
+/**
+ * Get all cart items for the current user
+ *
+ * @return wireArray The cart items
+ */
+  protected function getCartItems() {
+    
+    $user_id = $this->users->getCurrentUser()->id;
+    $admin_url = $this->config->url('admin');
+    $t_line_item = $this['t_line-item'];
+    $f_customer = $this['f_customer'];
+    return $this->pages->find("has_parent={$admin_url}orders/cart-items/, template={$t_line_item}, {$f_customer}={$user_id}");
   }
 /**
  * Get order number
@@ -576,32 +597,47 @@ public function removeCartItem($sku) {
  */
   protected function makeTemplate($key, $spec) {
 
+    $fg_name = $this[$key]; // From config
+    if(! $fg_name) {
+      throw new WireException(__LINE__ . ': Unable to create fieldgroup as name was not provided');
+    }
     $fg = new Fieldgroup();
-    $fg->name = str_replace('t_', 'fg_', $this[$key]);
+    $fg->name = str_replace('t_', 'fg_', $fg_name);
     $fg->add($this->fields->get('title'));
     if($key === 't_line-item') {
       foreach ($spec['t_fields'] as $fkey) {
-        $fg->add($this[$fkey]); // From config
+        $f_name = $this[$fkey]; // From config
+        if(! $f_name) {
+          throw new WireException(__LINE__ . ': Unable to add field as name was not provided');
+        }
+        $fg->add($f_name);
       }
     }
 
     $fg->save();
 
+    $t_name = $this[$key];
+    if(! $t_name) {
+      throw new WireException(__LINE__ . ': Unable to create fieldgroup as name was not provided');
+    }
     $t = new Template();
-    $t->name = $this[$key];
+    $t->name = $t_name;
     $t->fieldgroup = $fg;
     $t->save();
 
     if(array_key_exists('t_parents', $spec)) {
       // Set permitted parent templates
-      $f_selector = $this->getFamilySelector($spec['t_parents']);
-     $t->parentTemplates = $this->templates->find($f_selector);
+      $p_selector = $this->getFamilySelector($spec['t_parents']);
+      // $t->parentTemplates = $this->templates->find($f_selector);
+      $parent_templates = $this->templates->find($p_selector);
+      $t->parentTemplates($parent_templates);
     }
 
     if(array_key_exists('t_children', $spec)) {
       // Set permitted child templates
-      $f_selector = $this->getFamilySelector($spec['t_children']);
-      $t->childTemplates = $this->templates->find($f_selector);
+      $c_selector = $this->getFamilySelector($spec['t_children']);
+      $child_templates = $this->templates->find($c_selector);
+      $t->childTemplates($child_templates);
     }
 
     $t->save();

@@ -15,13 +15,14 @@ if($input->post->qtychange) {
 
 	// Input fields are arrays so all data can be submitted with single button
 	// Make order from this. We can display price /100, but probably store in original state
-	$items = $input->post['sku'];
-	foreach ($items as $key => $value) {
-		$str = 'SKU: ' . $input->post['sku'][$key];
-	    $str .= ' . Quantity: ' . $input->post['quantity'][$key];
-	    $str .= ' . Price: ' . $input->post['price'][$key] * $input->post['quantity'][$key]/100;
-	    bd($str);
-	}
+	// $items = $input->post['sku'];
+	// foreach ($items as $key => $value) {
+	// 	$str = 'SKU: ' . $input->post['sku'][$key];
+	//     $str .= ' . Quantity: ' . $input->post['quantity'][$key];
+	//     $str .= ' . Price: ' . $input->post['price'][$key] * $input->post['quantity'][$key]/100;
+	//     bd($str);
+	// }
+	$cart->placeOrder();
 }
 
 $out = "<!DOCTYPE html>

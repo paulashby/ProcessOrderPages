@@ -24,11 +24,11 @@ $products = $pages->find('template=product');
 foreach ($products as $product) {
 	$out .= "<form action='' method='post'>
 		<h2>" . $product->title . "</h2>
-		<label for='quantity'>Quantity (Packs of 6):</label>
-		<input type='number' id='quantity' name='quantity' min='1' step='1' value='1'>
+		<label class='.form__label' for='quantity'>Quantity (Packs of 6):</label>
+		<input class='.form__quantity' type='number' id='quantity' name='quantity' min='1' step='1' value='1'>
 		<input type='hidden' id='sku' name='sku' value='" . $product[$sku_field] . "'>
 		<input type='hidden' id='price' name='price' value='" . $product->price . "'>
-		  <input type='submit' name='submit' value='submit'> 
+		  <input class='form__button form__button--submit' type='submit' name='submit' value='submit'> 
 	</form>";
 }
 	
