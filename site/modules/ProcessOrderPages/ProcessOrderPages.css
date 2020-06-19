@@ -7,13 +7,15 @@
 	padding: 0;
 }
 .order-details {
+	font-style: italic;
 	list-style: none;
 	padding: 0;
 }
 .order-details__sku {
+	font-style: normal;
 	font-weight: bold;
 }
-.order-details__title {
+.order-details__qty {
 	/*color: #777676;*/
-	/*font-style: italic;*/
+	font-style: normal;
 }

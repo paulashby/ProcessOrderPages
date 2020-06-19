@@ -52,19 +52,24 @@ class ProcessOrderPages extends Process {
     }
 
     $sku = $this->sanitizer->text($item->sku);
-    $quantity = $this->sanitizer->int($item->quantity);
+    $new_quantity = $this->sanitizer->int($item->quantity);
+    bd('new quantity ' . $new_quantity);
     
     // Is there an existing order for this product?
-    $template = $this['t_line-item'];
-    $customer_field = $this['f_customer'];
-    $sku_field = $this['f_sku_ref'];
+    $f_customer = $this['f_customer'];
+    $f_sku_ref = $this['f_sku_ref'];
     $user_id = $this->users->getCurrentUser()->id;
-    $exists_in_cart = $this->pages->findOne('template=' . $template . ', ' . $customer_field . '=' . $user_id . ', ' . $sku_field . '=' . $sku);
+    $parent_selector = $this->config->url('admin') . 'orders/cart-items/';
+    $child_selector = "$f_customer=$user_id,$f_sku_ref=$sku";
+    bd('parent_selector: ' . $parent_selector);
+    bd('child_selector: ' . $child_selector);
+    $exists_in_cart = $this->pages->get($parent_selector)->child($child_selector);
+    bd('exists_in_cart = ' . print_r($exists_in_cart, true));
 
     if($exists_in_cart->id) {
       
       // Add to existing item
-      $sum = $quantity + $exists_in_cart[$this['f_quantity']];
+      $sum = $new_quantity + $exists_in_cart[$this['f_quantity']];
       $exists_in_cart->of(false);
       $exists_in_cart->set($this['f_quantity'], $sum);
       $exists_in_cart->save();
@@ -76,16 +81,14 @@ class ProcessOrderPages extends Process {
       $item_data = array('title' => $item_title);
       $item_data[$this['f_customer']] = $user_id;
       $item_data[$this['f_sku_ref']] = $sku;
-      $item_data[$this['f_quantity']] = $quantity;
+      $item_data[$this['f_quantity']] = $new_quantity;
 
-      $cart_item = $this->wire('pages')->add($this['t_line-item'],  '/processwire/orders/cart-items', $item_data);
+      $cart_item = $this->wire('pages')->add($this['t_line-item'],  $this->config->url('admin') . 'orders/cart-items', $item_data);
     }
     return json_encode(array("success"=>true));
   }
-  public function ___executeOld() {
-    
-    $feedback = '';
-
+  public function ___execute() {
+    // Live version
     if($this->input->post->submit) {
       
       $form = $this->modules->get('InputfieldForm');
@@ -115,73 +118,114 @@ class ProcessOrderPages extends Process {
       }
     }
 
-    // This was a test to add the customer to an order - now doing this by saving user->id into the 'customer' text field
-    // $this->pages->get(1021)->customer_test = $this->user;
-    // $p = $this->pages->get(1021);
-    // $p->of(false);
-    // $p->customer_test = $this->user;
-    // $p->save();
-    //////
+    $pending_orders = $this->getOrdersPage('pending')->children();
+    $active_orders = $this->getOrdersPage('active')->children();
+    //TODO: This could be counting empty 'folders' of user orders, now moved to completed
+    if(count($pending_orders) || count($pending_orders)) {
 
-    $out = "";
+      // Array to hold arrays of table rows
+      $table_rows = array();
 
-    $out .= $feedback;
+      $table = $this->modules->get('MarkupAdminDataTable');
+      $table->setEncodeEntities(false);
+      $table->headerRow(['Order Number', 'Product', 'Packs', 'Total', 'Customer', 'Status']);
 
-    $order_number = 100234;
+      
+      // foreach ($pending_orders as $user_orders) {
+      //   /* 
+      //   $user_orders is a PageArray of the Pending Orders - 
+      //   the pages representing each user's order pages
 
-    $form = $this->modules->get('InputfieldForm');
-    $form->action = './';
-    $form->method = 'post';
+      //   Pending Orders
+      //       00_Orders (user's order pages)
 
-    // This attribute sets state of button - value is either 'processed-form' or 'completed-form'
-    /*
-      "id+name" attribute sets state of button
-
-      Orders 
-    */
-    $form->attr('id+name','processed-form');
-
-    $field = $this->modules->get('InputfieldHidden');
-    $field->attr('id+name','processed-order');
-    $field->set('value', $order_number);
-    $form->add($field);
-
-    $button = $this->modules->get('InputfieldSubmit');
-    $button->value = 'Processed';
-    $form->add($button);
-
-    $table = $this->modules->get('MarkupAdminDataTable');
-    $table->setEncodeEntities(false);
-    $table->headerRow(['Order Number', 'Product', 'Packs', 'Total', 'Customer', 'Status']);
-
-    $table->row([$order_number, "<ul class='order-details'><li><span class='order-details__sku'>FL180</span> Another Fine Nest You&apos;ve Got Me Into</li><li><span class='order-details__sku'>699</span> A Flower for You</li></ul>", "<ul class='order-details'><li>2</li><li>4</li></ul>", "£16.00", "Medi Gifts & Homestyle",  $form->render()]);
-
-    $order_number = 100235;
-
-    $form = $this->modules->get('InputfieldForm');
-    $form->action = './';
-    $form->method = 'post';
-    $form->attr('id+name','completed-form');
-
-    $field = $this->modules->get('InputfieldHidden');
-    $field->attr('id+name','completed-order');
-    $field->set('value', $order_number);
-    $form->add($field);
-
-    $button = $this->modules->get('InputfieldSubmit');
-    $button->value = 'Completed';
-    $form->add($button);
-
-    $table->row([$order_number, "<ul class='order-details'><li><span class='order-details__sku'>NC706</span> Chrysanthemum</li></ul>", "<ul class='order-details'><li>2</li></ul>", '£3.50', 'Athena',  $form->render()]);
-
-    $out .= $table->render();
-
-    $out .= "<p><a href='./mysecondpage' class='ui-button ui-state-default'>Go to Page 2</a></p>";
-    
+      //   */
+      //   // Add this array of table rows to our array
+      //   $table_rows[] = $this->getTableRows($user_orders);
+      // }
+      // // Add them to the table
+      // foreach ($table_rows as $tr_array) {
+      //   // Each of these is an array of table rows
+      //   foreach ($tr_array as $row_out) {
+      //     $table->row($row_out);
+      //   }
+      // }
+      foreach ($pending_orders as $user_orders) {
+        foreach ($this->getTableRows($user_orders) as $row_out) {
+          $table->row($row_out);
+        }
+      }
+      //TODO: Do the same for $active_orders
+      $out = $table->render();
+    } else {
+      $out = "<p>There are currently no orders in the system";
+    }
     return $out;
   }
-  public function ___execute() {
-    // Live version
+ /**
+ * Iterate through order pages, adding children to table rows 
+ *
+ * @param PageArray $user_orders The parent pages
+ * @return array of table rows
+ */ 
+  protected function getTableRows($user_orders) {
+
+    $table_rows = array();
+
+    foreach ($user_orders as $order) {
+      $order_number = $order->name;
+
+      $form = $this->modules->get('InputfieldForm');
+      $form->action = './';
+      $form->method = 'post';
+
+      // This attribute sets state of button - value is either 'processed-form' or 'completed-form'
+      $form->attr('id+name','processed-form');
+
+      $field = $this->modules->get('InputfieldHidden');
+      $field->attr('id+name','processed-order');
+      $field->set('value', $order_number);
+      $form->add($field);
+
+      $button = $this->modules->get('InputfieldSubmit');
+      $button->value = 'Processed';
+      $form->add($button);
+
+      $product_detail_lis = '';
+      $quantity_lis = '';
+      $total = 0;
+
+      foreach ($order->children() as $line_item) {
+        $product_sku = $line_item[$this['f_sku_ref']];
+        $product_page = $this->pages->findOne("sku={$product_sku}");
+        $product_title = $product_page->title;
+        $product_price = $product_page->price;
+        $product_quantity = $line_item[$this['f_quantity']];
+        $product_detail_lis .=  "<li><span class='order-details__sku'>{$product_sku}</span> {$product_title}</li>";
+        $quantity_lis .= "<li class='order-details__qty'>{$product_quantity}</li>";
+        $total += $product_price * $product_quantity;
+      }
+      $order_total = $this->renderPrice( $total);
+      $curr_user = $this->users->getCurrentUser();
+      $user_id = $line_item[$this['f_customer']];
+      $order_customer = $this->users->get($user_id);
+      $customer_name_set = $order_customer[$this['f_display_name']];
+      $customer_display_name = $customer_name_set ? $customer_name_set : $order_customer->name;
+      $debug_array = array(
+        $order_number,  
+        $order_total, 
+        $customer_display_name
+      );
+      $table_rows[] = array(
+        $order_number, 
+        "<ul class='order-details'>{$product_detail_lis}</ul>", 
+        "<ul class='order-details'>{$quantity_lis}</ul>", 
+        $order_total, 
+        $customer_display_name,
+        $form->render()
+      );
+    }
+    return $table_rows;
   }
 ///TODO: Is there a better way to call this function? We really need it in place before an item is added to the cart
 /**
@@ -208,10 +252,10 @@ class ProcessOrderPages extends Process {
       't_step'              => array('t_parents' => array('admin'), 't_children' => array('t_order')),
     );
     $required_pages = array(
-      'cart-items'        =>  array('template' => 't_cart-item', 'parent'=>'/processwire/orders/', 'title'=>'Cart Items'),
-      'pending-orders'    =>  array('template' => 't_step', 'parent'=>'/processwire/orders/', 'title'=>'Pending Orders', ),
-      'active-orders'     =>  array('template' => 't_step', 'parent'=>'/processwire/orders/', 'title'=>'Active Orders', ),
-      'completed-orders'  =>  array('template' => 't_step', 'parent'=>'/processwire/orders/', 'title'=>'Completed Orders', )
+      'cart-items'        =>  array('template' => 't_cart-item', 'parent'=>$this->config->url('admin') . 'orders/', 'title'=>'Cart Items'),
+      'pending-orders'    =>  array('template' => 't_step', 'parent'=>$this->config->url('admin') . 'orders/', 'title'=>'Pending Orders', ),
+      'active-orders'     =>  array('template' => 't_step', 'parent'=>$this->config->url('admin') . 'orders/', 'title'=>'Active Orders', ),
+      'completed-orders'  =>  array('template' => 't_step', 'parent'=>$this->config->url('admin') . 'orders/', 'title'=>'Completed Orders', )
     );
 
     $safeToInstall = $this->preflightInstall(array('fields' => $required_fields, 'templates' => $required_templates));
@@ -340,7 +384,7 @@ class ProcessOrderPages extends Process {
       parent::___uninstall();
 
     } else {
-      throw new WireException("Unable to uninstall module as there are orders in progress. You can permanently delete this data from the /processwire/orders page, then try again");
+      throw new WireException("Unable to uninstall module as there are orders in progress. You can permanently delete this data from the " . $this->config->url('admin') . "orders page, then try again");
     }
   }
 /**
@@ -353,50 +397,56 @@ class ProcessOrderPages extends Process {
     // Get the parent page for the new order
     $errors = array();
 
-    $orders_parent = $this->getOrdersPage('pending');
-    if( ! $orders_parent) {
-      $errors[] = "The orders page could not be found";
-    }
-    $o_name = $this['t_order'];
+    $orders_parent = $this->getOrdersPage('pending', $this->users->getCurrentUser()->id);
+    
+    if($orders_parent) {
 
-    if(! $o_name) {
-      $errors[] = "The order template could not be identified";
-      return json_encode(array("errors"=>$errors));
-    }
-    $order_number = $this->getOrderNum();
+      $order_number = $this->getOrderNum();
 
-    // Create the order
-    $order_page = $this-> makePage($order_number, array('template' => 't_order', 'parent'=>$orders_parent->path(), 'title'=>$order_number));
-    $cart_items = $this->getCartItems();
+      // Create the order
+      $order_page = $this-> makePage($order_number, array('template' => 't_order', 'parent'=>$orders_parent->path(), 'title'=>$order_number));
+      $cart_items = $this->getCartItems();
 
-    foreach ($cart_items as $item) {
-      $item->of(false);
-      $item->parent = $order_page;
-      $item->save();
+      foreach ($cart_items as $item) {
+        $item->of(false);
+        $item->parent = $order_page;
+        $item->save();
+      }
+      return json_encode(array("success"=>true));
     }
-    return json_encode(array("success"=>true));
+    $errors[] = "The orders page could not be found";
+    return json_encode(array("errors"=>$errors));
   }
 /**
- * Get parent page for order
+ * Get parent page for order - for current user only if id supplied
  *
  * @param string $order_step
- * @return page or boolean false
+ * @param integer $user_id
+ * @return PageArray or Page
  */
-  protected function getOrdersPage($order_step) {
-    $user_id = $this->users->getCurrentUser()->id;
-    $pg_name = $user_id . "_orders";
+//TODO: Shouldn't we return false if this fails?
+  protected function getOrdersPage($order_step, $user_id = null) {
+    
     $admin_url = $this->config->url('admin');
-    $order_path = "{$admin_url}orders/{$order_step}-orders/";
-    $selector = "has_parent={$order_path}, name={ $pg_name}";
-    $user_order_page = $this->pages->findOne($selector);
-    $errors = array();
-
-    if( ! $user_order_page->id) {
+    $parent_path = "{$admin_url}orders/{$order_step}-orders/";
+    $parent_selector = "$parent_path,include=all"; 
+    $order_parent_name =  "{$user_id}_orders";
+    if($user_id) {
+      wire('log')->save('order-pages-debug', __LINE__);
+      // User provided, so get the orders page just for this customer
+      $child_selector = "name=$order_parent_name,include=all";
+      $user_order_page = $this->pages->get($parent_selector)->child($child_selector);
+      if($user_order_page->id) {
+        wire('log')->save('order-pages-debug', __LINE__);
+        return $user_order_page;
+      }
+      wire('log')->save('order-pages-debug', __LINE__);
       // No orders for this user - make a new page within pending orders
-      
-      $user_order_page = $this->makePage($pg_name, array('template' => 't_userorders', 'parent'=>$order_path, 'title'=>$pg_name));
+      return $this->makePage($pg_name, array('template' => 't_userorders', 'parent'=>$parent_path, 'title'=>$order_parent_name));
     }
-    return $user_order_page;
+    wire('log')->save('order-pages-debug', __LINE__);
+    // All orders for given step
+    return $this->pages->get($parent_path)->children();
   }
 /**
  * Remove line item from cart
@@ -406,10 +456,10 @@ class ProcessOrderPages extends Process {
  */
   public function removeCartItem($sku) {
     $cart_item = $this->getCartItem($sku);
-
     if($cart_item->id) {
-        $cart_item->delete();
-        return json_encode(array('success'=>true, 'cart'=>$this->renderCart()));  
+      bd(print_r($cart_item, true));
+      $cart_item->delete(true);
+      return json_encode(array('success'=>true, 'cart'=>$this->renderCart(true)));  
     }
     return json_encode(array('error'=>"The item could not be found"));
   }
@@ -418,7 +468,7 @@ class ProcessOrderPages extends Process {
  *
  * @param string  $sku The item to update
  * @param string  $qty The new value
- * @return Json
+ * @return Json Updated cart markup if successful
  */
   public function changeQuantity($sku, $qty) {
 
@@ -429,7 +479,7 @@ class ProcessOrderPages extends Process {
         $cart_item->of(false);
         $cart_item->set($this['f_quantity'], (int)$qtys);
         $cart_item->save();
-        return json_encode(array('success'=>true));  
+        return json_encode(array('success'=>true, 'cart'=>$this->renderCart(true)));  
     }
     return json_encode(array('error'=>"The item could not be found"));
   }
@@ -446,44 +496,48 @@ class ProcessOrderPages extends Process {
 /**
  * Generate HTML markup for current user's cart
  *
+ * @param boolean $omitContainer - true if outer div not required (useful to avoid losing click handler)
  * @return string HTML markup
  */
-  public function renderCart() {
+  public function renderCart($omitContainer = false) {
 
     // Store field and template names in variables for markup
     $f_sku = $this['f_sku'];
     $f_sku_ref = $this['f_sku_ref'];
     $f_quantity = $this['f_quantity'];
+    $open = $omitContainer ? "" : "<div class='cart-items'>";
+    $close = $omitContainer ? "" : "</div>";
 
     $cart_items = $this->getCartItems();
 
-    $render = "<div class='cart-items'>
-    <form class='.cart-items__form' action='' method='post'>";
+    $render = $open;
+    $render .= "<form class='cart-items__form' action='' method='post'>";
     // cart_items are line_items NOT product pages
     foreach ($cart_items as $item => $data) {
-
       $sku_ref = $data[$f_sku_ref];
+      $sku_uc = strtoupper($sku_ref);
       $product_selector = "template=product, {$f_sku}={$sku_ref}";
       $product = $this->pages->findOne($product_selector);
       $price = $this->renderPrice($product->price);
       $quantity = $data[$f_quantity];
       $subtotal = $this->renderPrice($product->price * $quantity);
 
-      $render .= "<fieldset class='.form__fieldset'>
+      $render .= "<fieldset class='form__fieldset'>
       <legend>" . $product->title . "</legend>";
       
       // Added <p> text to debug submitted form - as we're submitting inputs as arrays - name='quantity[]' etc - NOTE this <p> will only update when the page is reloaded as the quantity change is an ajax call and I'm not going to bother updating a value I'm only going to remove later
-      $render .= "<p>SKU: {$sku_ref}. Quantity: {$quantity}. Price: {$price}</p>
-        <label class='.form__label' for='quantity'>Quantity (Packs of 6):</label>
-        <input class='.form__quantity' type='number' data-action='qtychange' data-sku='{$sku_ref}' name='quantity[]' min='1' step='1' value='{$quantity}'>
-        <p class='.form__price'>{$price}</p>
+      $render .= "<p>SKU: {$sku_uc}</p>
+        <label class='form__label' for='quantity'>Quantity (Packs of 6):</label>
+        <input class='form__quantity' type='number' data-action='qtychange' data-sku='{$sku_ref}' name='quantity[]' min='1' step='1' value='{$quantity}'>
+        <p class='form__price'>Pack price: $price</p>
+        <p class='form__price--subtotal'>Subtotal: $subtotal</p>
         <input type='hidden' name='sku[]' value='{$sku_ref}'>
-        <a class='form__button form__button--cancel' role='button' data-action='remove' data-sku='{$sku_ref}'>Remove</a>
-      </fieldset>";
+        <input type='button' class='form__button form__button--remove' value='Remove' data-action='remove' data-sku='{$sku_ref}'>
+        </fieldset>";
     }
     $render .= "<input class='form__button form__button--submit' type='submit' name='submit' value='submit'>
-      </form>
-    </div>";
+      </form>";
+    $render .= $close;
 
     return $render;
   }
@@ -497,12 +551,12 @@ class ProcessOrderPages extends Process {
 
     $skus = $this->sanitizer->text($sku);
     $user_id = $this->users->getCurrentUser()->id;
-    $template_name = $this['t_line-item'];
-    $customer_field_name = $this['f_customer'];
-    $sku_field_name = $this['f_sku_ref'];
-
-    $selector = 'template=' . $template_name . ', ' . $customer_field_name . '=' .  $user_id . ', ' . $sku_field_name . '=' . $skus;
-    $cart_item = $this->pages->findOne($selector);
+    $f_customer = $this['f_customer'];
+    $f_sku_ref = $this['f_sku_ref'];
+    $admin_url = $this->config->url('admin');
+    $parent_selector = "{$admin_url}orders/cart-items/, include=all";
+    $child_selector = "{$f_customer}={$user_id}, {$f_sku_ref}={$skus}, include=all";
+    $cart_item = $this->pages->findOne($parent_selector)->child($child_selector);
 
     if($cart_item->id) {
       return $cart_item;
@@ -515,12 +569,11 @@ class ProcessOrderPages extends Process {
  * @return wireArray The cart items
  */
   protected function getCartItems() {
-    
     $user_id = $this->users->getCurrentUser()->id;
     $admin_url = $this->config->url('admin');
     $t_line_item = $this['t_line-item'];
     $f_customer = $this['f_customer'];
-    return $this->pages->find("has_parent={$admin_url}orders/cart-items/, template={$t_line_item}, {$f_customer}={$user_id}");
+    return $this->pages->findOne("{$admin_url}orders/cart-items/, include=all")->children("template={$t_line_item}, {$f_customer}={$user_id}, include=all");
   }
 /**
  * Get order number then increment in db
@@ -671,7 +724,6 @@ class ProcessOrderPages extends Process {
     $t->save();
     return $t;
   }
-
 /**
  * Make a template
  *

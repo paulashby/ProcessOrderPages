@@ -1,5 +1,4 @@
 <?php namespace ProcessWire;
-
 $cart = $modules->get("ProcessOrderPages");
 $sku_field = $cart['f_sku'];
 
@@ -17,10 +16,11 @@ $out =
 	<meta charset='UTF-8'>
 	<title>$page->title</title>
 </head>
-<body>";
+<body>
+<p><a href='" . $pages->get('/cart/')->url() . "'>Cart</a></p>";
 
 $products = $pages->find('template=product');
-
+$out .= "<div class='products'>";
 foreach ($products as $product) {
 	$out .= "<form action='' method='post'>
 		<h2>" . $product->title . "</h2>
@@ -28,10 +28,10 @@ foreach ($products as $product) {
 		<input class='.form__quantity' type='number' id='quantity' name='quantity' min='1' step='1' value='1'>
 		<input type='hidden' id='sku' name='sku' value='" . $product[$sku_field] . "'>
 		<input type='hidden' id='price' name='price' value='" . $product->price . "'>
-		  <input class='form__button form__button--submit' type='submit' name='submit' value='submit'> 
+		  <input class='form__button form__button--submit' type='submit' name='submit' value='submit' data-action='submit'> 
 	</form>";
 }
-	
+$out .= "</div>";	
 $out .= "</body>
 </html>";
 echo $out;

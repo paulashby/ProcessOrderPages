@@ -33,9 +33,11 @@ $out = "<!DOCTYPE html>
 	<script src='https://ajax.googleapis.com/ajax/libs/jquery/3.5.1/jquery.min.js'></script>
 	<script src='" . $config->urls->templates . "scripts/cart.js'></script>
 </head>
-<body>";
+<body>
+<p><a href='" . $pages->get('/products/')->url() . "'>Continue shopping</a></p>";
 	$out .= $cart->renderCart();
-	$out .= "</body>
+	$out .= "
+	</body>
 </html>";
 
 echo $out;

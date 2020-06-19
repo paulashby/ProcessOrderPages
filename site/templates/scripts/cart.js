@@ -9,10 +9,11 @@ var Cart = (function () {
 	        },
 	        qtychange: function (e, data) {
 	        	//TODO: Provide success feedback
+	        	$('.cart-items__form').replaceWith(data.cart);
 	        },
 	        remove: function (e, data) {
 	        	//TODO: Provide success feedback
-	        	$('.cart-items').replaceWith(data.cart);
+	        	$('.cart-items__form').replaceWith(data.cart);
 	        }
 	    }
 	};
@@ -102,7 +103,7 @@ var Cart = (function () {
 	function dataAttrClickHandler (e, actions) {
 
 	    var action = $(e.target).data('action');
-
+		console.count('clicked');
 	    if(actions[action]) {
 	        actions[action](e);
 	    }
