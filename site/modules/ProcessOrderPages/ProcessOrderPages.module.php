@@ -98,67 +98,45 @@ class ProcessOrderPages extends Process {
         $out .= $form->render();
       } else {
         $operation = $this->sanitizer->text($this->input->post->submit);
-
-        // For order pages,move the Cart Items pages to become children of the order
-        /*
-          $page = $pages->get('name=page-to-move');
-          $page->of(false);
-          $page->parent = $pages->get('name=new-parent');
-          $page->save();
-
-        */
-        
+        bd('operation: ' . $operation);
         if($operation === 'Processed') {
-          $order_num = $this->sanitizer->text($this->input->post['processed-order']);
-          $feedback = "<h1>Processed - should change {$order_num} to completed</h1>";
+          $order_num = $this->sanitizer->text($this->input->post['pending-order']);
+          $this->progressOrder($order_num, 'active');
         } else if ($operation === 'Completed') {
           $order_num = $this->sanitizer->text($this->input->post['completed-order']);
-          $feedback = "<h1>Completed - should move {$order_num} to completed orders</h1>";
+          $this->progressOrder($order_num, 'completed');
         }
       }
     }
 
+    // Operations are 'Processed' and 'Completed'!!!
     $pending_orders = $this->getOrdersPage('pending')->children();
     $active_orders = $this->getOrdersPage('active')->children();
-    //TODO: This could be counting empty 'folders' of user orders, now moved to completed
-    if(count($pending_orders) || count($pending_orders)) {
+    $num_orders = 0;
+    // Array to hold arrays of table rows
+    $table_rows = array();
 
-      // Array to hold arrays of table rows
-      $table_rows = array();
+    $table = $this->modules->get('MarkupAdminDataTable');
+    $table->setEncodeEntities(false);
+    $table->headerRow(['Order Number', 'Product', 'Packs', 'Total', 'Customer', 'Status']);
 
-      $table = $this->modules->get('MarkupAdminDataTable');
-      $table->setEncodeEntities(false);
-      $table->headerRow(['Order Number', 'Product', 'Packs', 'Total', 'Customer', 'Status']);
-
-      
-      // foreach ($pending_orders as $user_orders) {
-      //   /* 
-      //   $user_orders is a PageArray of the Pending Orders - 
-      //   the pages representing each user's order pages
-
-      //   Pending Orders
-      //       00_Orders (user's order pages)
-
-      //   */
-      //   // Add this array of table rows to our array
-      //   $table_rows[] = $this->getTableRows($user_orders);
-      // }
-      // // Add them to the table
-      // foreach ($table_rows as $tr_array) {
-      //   // Each of these is an array of table rows
-      //   foreach ($tr_array as $row_out) {
-      //     $table->row($row_out);
-      //   }
-      // }
-      foreach ($pending_orders as $user_orders) {
-        foreach ($this->getTableRows($user_orders) as $row_out) {
-          $table->row($row_out);
-        }
+    foreach ($pending_orders as $user_orders) {
+      foreach ($this->getTableRows($user_orders, 'pending') as $row_out) {
+        $num_orders++;
+        $table->row($row_out);
       }
-      //TODO: Do the same for $active_orders
-      $out = $table->render();
-    } else {
-      $out = "<p>There are currently no orders in the system";
+    }
+    foreach ($active_orders as $user_orders) {
+      foreach ($this->getTableRows($user_orders, 'processed') as $row_out) {
+        $num_orders++;
+        $table->row($row_out);
+      }
+    }
+    //TODO: Do the same for $active_orders
+    $out = $table->render();
+    
+    if($num_orders === 0) {
+      $out .= "<p>There are no orders currently in the system";
     }
     return $out;
   }
@@ -166,12 +144,13 @@ class ProcessOrderPages extends Process {
  * Iterate through order pages, adding children to table rows 
  *
  * @param PageArray $user_orders The parent pages
+ * @param string $step The order status
  * @return array of table rows
  */ 
-  protected function getTableRows($user_orders) {
+  protected function getTableRows($user_orders, $step) {
 
     $table_rows = array();
-
+bd('step: ' . $step);
     foreach ($user_orders as $order) {
       $order_number = $order->name;
 
@@ -180,15 +159,15 @@ class ProcessOrderPages extends Process {
       $form->method = 'post';
 
       // This attribute sets state of button - value is either 'processed-form' or 'completed-form'
-      $form->attr('id+name','processed-form');
+      $form->attr('id+name',"{$step}-form");
 
       $field = $this->modules->get('InputfieldHidden');
-      $field->attr('id+name','processed-order');
+      $field->attr('id+name', "{$step}-order");
       $field->set('value', $order_number);
       $form->add($field);
 
       $button = $this->modules->get('InputfieldSubmit');
-      $button->value = 'Processed';
+      $button->value = $step === 'pending' ? 'Processed' : 'Completed';
       $form->add($button);
 
       $product_detail_lis = '';
@@ -418,6 +397,29 @@ class ProcessOrderPages extends Process {
     return json_encode(array("errors"=>$errors));
   }
 /**
+ * Move order to next step to reflect new status
+ *
+ * @param string $order_num
+ * @param string $order_step
+ * @return boolean
+ */
+  protected function progressOrder($order_num, $order_step) {
+    $order_selector = "template=" . $this['t_order'] . ",name={$order_num}";
+    $admin_url = $this->config->url('admin');
+    $order_pg = $this->pages->findOne($order_selector);
+    bd($order_selector);
+    if($order_pg->id){
+      // Get the customer
+      $customer = $order_pg->children()->first()[$this['f_customer']];
+      $next_step = $this->getOrdersPage($order_step, $customer);
+      $order_pg->of(false);
+      $order_pg->parent = $next_step;
+      $order_pg->save();
+      return true;
+    }
+    return false;
+  }
+/**
  * Get parent page for order - for current user only if id supplied
  *
  * @param string $order_step
@@ -432,19 +434,15 @@ class ProcessOrderPages extends Process {
     $parent_selector = "$parent_path,include=all"; 
     $order_parent_name =  "{$user_id}_orders";
     if($user_id) {
-      wire('log')->save('order-pages-debug', __LINE__);
       // User provided, so get the orders page just for this customer
       $child_selector = "name=$order_parent_name,include=all";
       $user_order_page = $this->pages->get($parent_selector)->child($child_selector);
       if($user_order_page->id) {
-        wire('log')->save('order-pages-debug', __LINE__);
         return $user_order_page;
       }
-      wire('log')->save('order-pages-debug', __LINE__);
       // No orders for this user - make a new page within pending orders
-      return $this->makePage($pg_name, array('template' => 't_userorders', 'parent'=>$parent_path, 'title'=>$order_parent_name));
+      return $this->makePage($order_parent_name, array('template' => 't_userorders', 'parent'=>$parent_path, 'title'=>$order_parent_name));
     }
-    wire('log')->save('order-pages-debug', __LINE__);
     // All orders for given step
     return $this->pages->get($parent_path)->children();
   }
