@@ -170,11 +170,12 @@ class ProcessOrderPages extends Process {
 
       foreach ($order->children() as $line_item) {
         $product_sku = $line_item[$this['f_sku_ref']];
+        $sku_uc = strtoupper($product_sku);
         $product_page = $this->pages->findOne("sku={$product_sku}");
         $product_title = $product_page->title;
         $product_price = $product_page->price;
         $product_quantity = $line_item[$this['f_quantity']];
-        $product_detail_lis .=  "<li><span class='order-details__sku'>{$product_sku}</span> {$product_title}</li>";
+        $product_detail_lis .=  "<li><span class='order-details__sku'>{$sku_uc}</span> {$product_title}</li>";
         $quantity_lis .= "<li class='order-details__qty'>{$product_quantity}</li>";
         $total += $product_price * $product_quantity;
       }
