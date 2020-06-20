@@ -179,9 +179,9 @@ class ProcessOrderPages extends Process {
     $required_templates = array(
       't_line-item'         => array('t_parents' => array('t_cart-item', 't_order'), 't_fields'=>array('f_customer', 'f_sku_ref', 'f_quantity')),
       't_cart-item'         => array('t_parents' => array('admin'), 't_children' => array('t_line-item')),
-      't_order'             => array('t_parents' => array('t_step'), 't_children' => array('t_line-item')),
-      't_user-orders'        => array('t_parents' => array('t_order'), 't_children' => array('t_order')),
-      't_step'              => array('t_parents' => array('admin'), 't_children' => array('t_order')),
+      't_order'             => array('t_parents' => array('t_user-orders'), 't_children' => array('t_line-item')),
+      't_user-orders'        => array('t_parents' => array('t_step'), 't_children' => array('t_order')),
+      't_step'              => array('t_parents' => array('admin'), 't_children' => array('t_user-orders')),
     );
     $required_pages = array(
       'cart-items'        =>  array('template' => 't_cart-item', 'parent'=>$this->config->url('admin') . 'orders/', 'title'=>'Cart Items'),
