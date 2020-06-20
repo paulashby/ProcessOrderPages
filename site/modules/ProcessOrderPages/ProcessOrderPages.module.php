@@ -22,6 +22,7 @@ class ProcessOrderPages extends Process {
       ],
     ];
   }
+  //TODO: Shipping
   public function init() {
 
      parent::init();
@@ -39,49 +40,6 @@ class ProcessOrderPages extends Process {
       }
       $event->return = str_replace(array('uk-margin-top', 'ui-button'), array('', 'ui-button ui-button' . $class_suffix), $return);
     });
-  }
-/**
- * Add product to cart (creates a line-item page as child of /processwire/orders/cart-items)
- *
- * @param string $item The submitted form
- * @return string The configured field name
- */
-  public function addToCart($item) {
-    if( ! $this->ready) {
-      $this->completeInstallation($item);
-    }
-
-    $sku = $this->sanitizer->text($item->sku);
-    $new_quantity = $this->sanitizer->int($item->quantity);
-    
-    // Is there an existing order for this product?
-    $f_customer = $this['f_customer'];
-    $f_sku_ref = $this['f_sku_ref'];
-    $user_id = $this->users->getCurrentUser()->id;
-    $parent_selector = $this->config->url('admin') . 'orders/cart-items/';
-    $child_selector = "$f_customer=$user_id,$f_sku_ref=$sku";
-    $exists_in_cart = $this->pages->get($parent_selector)->child($child_selector);
-
-    if($exists_in_cart->id) {
-      
-      // Add to existing item
-      $sum = $new_quantity + $exists_in_cart[$this['f_quantity']];
-      $exists_in_cart->of(false);
-      $exists_in_cart->set($this['f_quantity'], $sum);
-      $exists_in_cart->save();
-
-    } else { 
-
-      // Create a new item
-      $item_title = $sku . ': ' . $this->users->get($user_id)[$this['f_display_name']];
-      $item_data = array('title' => $item_title);
-      $item_data[$this['f_customer']] = $user_id;
-      $item_data[$this['f_sku_ref']] = $sku;
-      $item_data[$this['f_quantity']] = $new_quantity;
-
-      $cart_item = $this->wire('pages')->add($this['t_line-item'],  $this->config->url('admin') . 'orders/cart-items', $item_data);
-    }
-    return json_encode(array("success"=>true));
   }
   public function ___execute() {
     // Live version
@@ -360,6 +318,50 @@ class ProcessOrderPages extends Process {
     } else {
       throw new WireException("Unable to uninstall module as there are orders in progress. You can permanently delete this data from the " . $this->config->url('admin') . "orders page, then try again");
     }
+  }
+  
+/**
+ * Add product to cart (creates a line-item page as child of /processwire/orders/cart-items)
+ *
+ * @param string $item The submitted form
+ * @return string The configured field name
+ */
+  public function addToCart($item) {
+    if( ! $this->ready) {
+      $this->completeInstallation($item);
+    }
+
+    $sku = $this->sanitizer->text($item->sku);
+    $new_quantity = $this->sanitizer->int($item->quantity);
+    
+    // Is there an existing order for this product?
+    $f_customer = $this['f_customer'];
+    $f_sku_ref = $this['f_sku_ref'];
+    $user_id = $this->users->getCurrentUser()->id;
+    $parent_selector = $this->config->url('admin') . 'orders/cart-items/';
+    $child_selector = "$f_customer=$user_id,$f_sku_ref=$sku";
+    $exists_in_cart = $this->pages->get($parent_selector)->child($child_selector);
+
+    if($exists_in_cart->id) {
+      
+      // Add to existing item
+      $sum = $new_quantity + $exists_in_cart[$this['f_quantity']];
+      $exists_in_cart->of(false);
+      $exists_in_cart->set($this['f_quantity'], $sum);
+      $exists_in_cart->save();
+
+    } else { 
+
+      // Create a new item
+      $item_title = $sku . ': ' . $this->users->get($user_id)[$this['f_display_name']];
+      $item_data = array('title' => $item_title);
+      $item_data[$this['f_customer']] = $user_id;
+      $item_data[$this['f_sku_ref']] = $sku;
+      $item_data[$this['f_quantity']] = $new_quantity;
+
+      $cart_item = $this->wire('pages')->add($this['t_line-item'],  $this->config->url('admin') . 'orders/cart-items', $item_data);
+    }
+    return json_encode(array("success"=>true));
   }
 /**
  * Process line items, creating new order in /processwire/orders/pending-orders/
