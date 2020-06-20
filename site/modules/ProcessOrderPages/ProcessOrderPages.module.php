@@ -180,7 +180,7 @@ class ProcessOrderPages extends Process {
       't_line-item'         => array('t_parents' => array('t_cart-item', 't_order'), 't_fields'=>array('f_customer', 'f_sku_ref', 'f_quantity')),
       't_cart-item'         => array('t_parents' => array('admin'), 't_children' => array('t_line-item')),
       't_order'             => array('t_parents' => array('t_step'), 't_children' => array('t_line-item')),
-      't_userorders'        => array('t_parents' => array('t_order'), 't_children' => array('t_order')),
+      't_user-orders'        => array('t_parents' => array('t_order'), 't_children' => array('t_order')),
       't_step'              => array('t_parents' => array('admin'), 't_children' => array('t_order')),
     );
     $required_pages = array(
@@ -437,7 +437,7 @@ class ProcessOrderPages extends Process {
         return $user_order_page;
       }
       // No orders for this user - make a new page within pending orders
-      return $this->makePage($order_parent_name, array('template' => 't_userorders', 'parent'=>$parent_path, 'title'=>$order_parent_name));
+      return $this->makePage($order_parent_name, array('template' => 't_user-orders', 'parent'=>$parent_path, 'title'=>$order_parent_name));
     }
     // All orders for given step
     return $this->pages->get($parent_path)->children();

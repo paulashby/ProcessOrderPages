@@ -91,7 +91,7 @@ $config = array(
 		'required' => true 
 	),
 	'userOrdersTemplate' => array(
-		'name'=> 't_userorders',
+		'name'=> 't_user-orders',
 		'type' => 'text', 
 		'label' => 'Name for user orders template', //This is the label of the field on the config page
 		'description' => 'Please use a unique name if this collides with an existing template name',
