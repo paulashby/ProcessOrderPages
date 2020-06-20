@@ -32,7 +32,7 @@ class ProcessOrderPages extends Process {
       // Add class suffix for css to remove top margin and set button colour according to status
       $return = $event->return;
 
-      if (strpos($return, 'processed-form') !== false) {
+      if (strpos($return, 'active-form') !== false) {
         $class_suffix = '--pending';
       } else {
         $class_suffix = '--processed';
@@ -53,7 +53,6 @@ class ProcessOrderPages extends Process {
 
     $sku = $this->sanitizer->text($item->sku);
     $new_quantity = $this->sanitizer->int($item->quantity);
-    bd('new quantity ' . $new_quantity);
     
     // Is there an existing order for this product?
     $f_customer = $this['f_customer'];
@@ -61,10 +60,7 @@ class ProcessOrderPages extends Process {
     $user_id = $this->users->getCurrentUser()->id;
     $parent_selector = $this->config->url('admin') . 'orders/cart-items/';
     $child_selector = "$f_customer=$user_id,$f_sku_ref=$sku";
-    bd('parent_selector: ' . $parent_selector);
-    bd('child_selector: ' . $child_selector);
     $exists_in_cart = $this->pages->get($parent_selector)->child($child_selector);
-    bd('exists_in_cart = ' . print_r($exists_in_cart, true));
 
     if($exists_in_cart->id) {
       
@@ -98,12 +94,12 @@ class ProcessOrderPages extends Process {
         $out .= $form->render();
       } else {
         $operation = $this->sanitizer->text($this->input->post->submit);
-        bd('operation: ' . $operation);
+        
         if($operation === 'Processed') {
           $order_num = $this->sanitizer->text($this->input->post['pending-order']);
           $this->progressOrder($order_num, 'active');
         } else if ($operation === 'Completed') {
-          $order_num = $this->sanitizer->text($this->input->post['completed-order']);
+          $order_num = $this->sanitizer->text($this->input->post['active-order']);
           $this->progressOrder($order_num, 'completed');
         }
       }
@@ -127,12 +123,11 @@ class ProcessOrderPages extends Process {
       }
     }
     foreach ($active_orders as $user_orders) {
-      foreach ($this->getTableRows($user_orders, 'processed') as $row_out) {
+      foreach ($this->getTableRows($user_orders, 'active') as $row_out) {
         $num_orders++;
         $table->row($row_out);
       }
     }
-    //TODO: Do the same for $active_orders
     $out = $table->render();
     
     if($num_orders === 0) {
@@ -150,10 +145,9 @@ class ProcessOrderPages extends Process {
   protected function getTableRows($user_orders, $step) {
 
     $table_rows = array();
-bd('step: ' . $step);
+
     foreach ($user_orders as $order) {
       $order_number = $order->name;
-
       $form = $this->modules->get('InputfieldForm');
       $form->action = './';
       $form->method = 'post';
@@ -407,7 +401,7 @@ bd('step: ' . $step);
     $order_selector = "template=" . $this['t_order'] . ",name={$order_num}";
     $admin_url = $this->config->url('admin');
     $order_pg = $this->pages->findOne($order_selector);
-    bd($order_selector);
+    
     if($order_pg->id){
       // Get the customer
       $customer = $order_pg->children()->first()[$this['f_customer']];
@@ -426,7 +420,6 @@ bd('step: ' . $step);
  * @param integer $user_id
  * @return PageArray or Page
  */
-//TODO: Shouldn't we return false if this fails?
   protected function getOrdersPage($order_step, $user_id = null) {
     
     $admin_url = $this->config->url('admin');
@@ -455,7 +448,7 @@ bd('step: ' . $step);
   public function removeCartItem($sku) {
     $cart_item = $this->getCartItem($sku);
     if($cart_item->id) {
-      bd(print_r($cart_item, true));
+      
       $cart_item->delete(true);
       return json_encode(array('success'=>true, 'cart'=>$this->renderCart(true)));  
     }
@@ -523,7 +516,6 @@ bd('step: ' . $step);
       $render .= "<fieldset class='form__fieldset'>
       <legend>" . $product->title . "</legend>";
       
-      // Added <p> text to debug submitted form - as we're submitting inputs as arrays - name='quantity[]' etc - NOTE this <p> will only update when the page is reloaded as the quantity change is an ajax call and I'm not going to bother updating a value I'm only going to remove later
       $render .= "<p>SKU: {$sku_uc}</p>
         <label class='form__label' for='quantity'>Quantity (Packs of 6):</label>
         <input class='form__quantity' type='number' data-action='qtychange' data-sku='{$sku_ref}' name='quantity[]' min='1' step='1' value='{$quantity}'>
@@ -723,7 +715,7 @@ bd('step: ' . $step);
     return $t;
   }
 /**
- * Make a template
+ * Apply family settings to template to restrict permitted parent and child templates
  *
  * @param string $key name of config input field
  * @param array $spec [array $t_parents [string Template name], array $t_children [string Template name], $array T_field $array [string Field name]]

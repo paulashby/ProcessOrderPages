@@ -1,5 +1,5 @@
-.ui-button.ui-button--pending,
-.ui-button--pending .ui-button.ui-button--pending-text {
+.ui-button.ui-button--processed,
+.ui-button--processed .ui-button.ui-button--processed-text {
 	background-color: #ca5e5e;
 }
 .ui-button--pending .ui-button,
