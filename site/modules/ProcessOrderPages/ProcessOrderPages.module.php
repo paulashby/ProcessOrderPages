@@ -25,10 +25,10 @@ class ProcessOrderPages extends Process {
   //TODO: Shipping
   public function init() {
 
-     parent::init();
+    parent::init();
 
     // include css
-     $this->addHookAfter('InputfieldForm::render', function(HookEvent $event) {
+    $this->addHookAfter('InputfieldForm::render', function(HookEvent $event) {
 
       // Add class suffix for css to remove top margin and set button colour according to status
       $return = $event->return;
@@ -195,7 +195,7 @@ class ProcessOrderPages extends Process {
     // Handle errors or proceed
     if($safeToInstall !== true) {
       wire('log')->save('order-pages-debug', __LINE__);
-       wire('log')->save('order-pages-debug', print_r($safeToInstall, true));
+      wire('log')->save('order-pages-debug', print_r($safeToInstall, true));
 
       // The addToCart() operation that called this method will fail. Send an email to notify superusers
 
@@ -275,7 +275,7 @@ class ProcessOrderPages extends Process {
 
     $module_elmts = array(
       'pages' => array('cart-items', 'pending-orders', 'active-orders', 'completed-orders'),
-      'templates' => array('t_line-item', 't_cart-item', 't_order', 't_step'),
+      'templates' => array('t_line-item', 't_cart-item', 't_order', 't_user-orders', 't_step'),
       'fields' => array('f_display_name', 'f_customer', 'f_sku_ref', 'f_quantity')
     );
 
@@ -319,7 +319,7 @@ class ProcessOrderPages extends Process {
       throw new WireException("Unable to uninstall module as there are orders in progress. You can permanently delete this data from the " . $this->config->url('admin') . "orders page, then try again");
     }
   }
-  
+
 /**
  * Add product to cart (creates a line-item page as child of /processwire/orders/cart-items)
  *
