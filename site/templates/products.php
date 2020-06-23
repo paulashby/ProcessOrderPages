@@ -1,10 +1,13 @@
 <?php namespace ProcessWire;
+
 $cart = $modules->get("ProcessOrderPages");
 $sku_field = $cart['f_sku'];
 
 // Process 'add to cart' requests
 if($input->post->submit) {
+
 	if($user->isLoggedin()) {
+
 		$cart->addToCart($input->post);
     }	
 }
@@ -20,8 +23,11 @@ $out =
 <p><a href='" . $pages->get('/cart/')->url() . "'>Cart</a></p>";
 
 $products = $pages->find('template=product');
+
 $out .= "<div class='products'>";
+
 foreach ($products as $product) {
+
 	$out .= "<form action='' method='post'>
 		<h2>" . $product->title . "</h2>
 		<label class='.form__label' for='quantity'>Quantity (Packs of 6):</label>
@@ -30,8 +36,11 @@ foreach ($products as $product) {
 		<input type='hidden' id='price' name='price' value='" . $product->price . "'>
 		  <input class='form__button form__button--submit' type='submit' name='submit' value='submit' data-action='submit'> 
 	</form>";
+
 }
+
 $out .= "</div>";	
 $out .= "</body>
 </html>";
+
 echo $out;

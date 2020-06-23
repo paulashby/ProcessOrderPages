@@ -4,48 +4,233 @@ class ProcessOrderPages extends Process {
 
   public static function getModuleinfo() {
     return [
-      'title' => 'Process Order Pages',
-      'summary' => 'Allows order pages to be created on front end and managed via admin.',
-      'author' => 'Paul Ashby, primitive.co',
-      'version' => 1,
-      'singular' => true,
-      'requires' => [
-        'FieldtypeTextUnique>=1.0.0'
+      "title" => "Process Order Pages",
+      "summary" => "Allows order pages to be created on front end and managed via admin.",
+      "author" => "Paul Ashby, primitive.co",
+      "version" => 1,
+      "singular" => true,
+      'autoload' => true,
+      "requires" => [
+        "FieldtypeTextUnique>=1.0.0", "PageMaker>=0.0.1"
       ],
 
       // page that you want created to execute this module
-      'page' => [
+      "page" => [
         // your page will be online at /processwire/yourname/
-        'name' => 'orders',
+        "name" => "orders",
         // page title for this admin-page
-        'title' => 'Orders',
+        "title" => "Orders",
       ],
     ];
   }
-  //TODO: Shipping
-  public function init() {
 
+  //TODO: Shipping?
+
+  public function ready() {
+    $this->addHookBefore("Modules::saveConfig", $this, "customSaveConfig");
+  }
+  public function init() {
+    
+    // include supporting files (css, js)
     parent::init();
 
-    // include css
-    $this->addHookAfter('InputfieldForm::render', function(HookEvent $event) {
+    $this->addHookBefore("Modules::uninstall", $this, "customUninstall");
+    $this->addHookAfter("InputfieldForm::render", $this, "customInputfieldFormRender");
 
-      // Add class suffix for css to remove top margin and set button colour according to status
-      $return = $event->return;
-
-      if (strpos($return, 'active-form') !== false) {
-        $class_suffix = '--pending';
-      } else {
-        $class_suffix = '--processed';
-      }
-      $event->return = str_replace(array('uk-margin-top', 'ui-button'), array('', 'ui-button ui-button' . $class_suffix), $return);
-    });
   }
+/**
+ * Store info for created elements and pass to completeInstall function
+ *
+ * @param  HookEvent $event
+ */
+  public function customSaveConfig($event) {
+    
+    $class = $event->arguments(0);
+    if($class !== $this->className) return;
+   
+    // Config input
+    $data = $event->arguments(1);
+    $modules = $event->object;
+    $page_maker = $modules->get("PageMaker");
+    $configured = array_key_exists("configured", $data);
+
+    if($configured){
+      
+      // We don't want to change anything once installed, so show warning and submit existing data if anything has been changed
+      if($this->configDiff($data)) {
+      
+        $this->session->warning("Names cannot be changed after installation. If you really need to rename, you can reinstall the module, but be aware that this will mean losing the order data currently in the system");
+        $curr_config = $this->modules->getConfig("PageMaker");
+        $event->arguments(1, $curr_config);
+
+      } else {
+        
+        // All good since we're changing nothing
+        $event->arguments(1, $data);
+
+      }
+    } else {
+     
+      // Just installed module
+      $data["configured"] = true; // Set flag
+      $order_root_id = $data["order_root_location"];
+      $order_root = $this->pages->get($order_root_id);
+
+      if($order_root->id) {
+
+        $order_root_path = $order_root->path();
+
+      } else {
+       
+        $order_root_path = "/";
+        $order_root = $this->pages->get("/");
+      }
+      
+      $pgs = array(
+        "fields" => array(
+          "f_customer" => array("fieldtype"=>"FieldtypeText", "label"=>"Customer"),
+          "f_sku_ref" => array("fieldtype"=>"FieldtypeText", "label"=>"Record of cart item sku"),
+          "f_quantity" => array("fieldtype"=>"FieldtypeInteger", "label"=>"Number of packs")
+        ),
+        "templates" => array(
+          "t_line-item" => array("t_parents" => array("t_cart-item", "t_order"), "t_fields"=>array("f_customer", "f_sku_ref", "f_quantity")),
+          "t_cart-item" => array("t_parents" => array("t_section"), "t_children" => array("t_line-item")),
+          "t_order" => array("t_parents" => array("t_user-orders"), "t_children" => array("t_line-item")),
+          "t_user-orders" => array("t_parents" => array("t_step"), "t_children" => array("t_order")),
+          "t_step" => array("t_parents" => array("t_section"), "t_children" => array("t_user-orders")),
+          "t_section" => array("t_children" => array("t_section", "t_cart-item"))
+        ),
+        "pages" => array(
+          "order-pages" => array("template" => "t_section", "parent"=>$order_root_path, "title"=>"Order Pages"),
+          "cart-items" => array("template" => "t_cart-item", "parent"=>"{$order_root_path}order-pages/", "title"=>"Cart Items"),
+          "pending-orders" => array("template" => "t_step", "parent"=>"{$order_root_path}order-pages/", "title"=>"Pending Orders", ),
+          "active-orders" => array("template" => "t_step", "parent"=>"{$order_root_path}order-pages/", "title"=>"Active Orders", ),
+          "completed-orders" => array("template" => "t_step", "parent"=>"{$order_root_path}order-pages/", "title"=>"Completed Orders", )
+        )
+      );
+
+      $made_pages = $page_maker->makePages($pgs, $data);
+      if($made_pages !== true){
+        
+        foreach ($made_pages as $e) {
+          $this->error($e);
+        }
+        throw new WireException($e . ". Please uninstall the module then try again using unique names.");
+      } else {
+
+        $data["order_root"] = $order_root_path . "order-pages";
+        
+        // Add display_name field to user template
+        $f = new Field();
+        $f->type = $this->modules->get("FieldtypeText");
+        $f_name = $data["f_display_name"];
+        $f->name = $f_name;
+        $f->label = "Name displayed on orders";
+        $f->save();
+        $usr_template = $this->templates->get("user");
+        $ufg = $usr_template->fieldgroup;
+        $ufg->add($f);
+        $ufg->save();
+
+        // Set initial value of this field to user name 
+        foreach ($this->users->find("start=0") as $u) {
+          $u->of(false);
+          $u->set($f_name, $u->name);
+          $u->save();
+        }
+      }
+      $event->arguments(1, $data);
+    }   
+  }
+
+
+
+
+/**
+ * Custom uninstall 
+ * 
+ * @param HookEvent $event
+ */
+  public function customUninstall($event) {
+
+    $class = $event->arguments(0);
+    if($class !== $this->className) return;
+
+    $page_maker = $this->modules->get("PageMaker");
+    $pages_removed = $page_maker->removePages();
+
+    if($pages_removed !== true) {
+      if(gettype($pages_removed) === "string"){
+        // PageMaker files still on system - abort uninstall
+        $this->error($pages_removed);
+        $event->replace = true; // prevent uninstall
+        $this->session->redirect("./edit?name=$class"); 
+      } else {
+        // No pages on system, but some fields or templates remain - PageMaker has shown errors
+      }
+    } else {
+      
+      // Remove display_name field from user template
+      $f_name = $this["f_display_name"];
+      $rm_fld = wire("fields")->get($f_name);
+      if($rm_fld !== null) {
+        $ufg = wire("fieldgroups")->get("user");
+        $ufg->remove($rm_fld);
+        $ufg->save();
+        wire("fields")->delete($rm_fld);
+      }
+    } 
+  }
+/**
+ * Check for config naming collisions between common config elements
+ *
+ * @param Array $new_config New config array to check
+ * @return Boolean - do common config entries differ?
+ */
+  public function configDiff($new_config) {
+
+    $curr_config = $this->modules->getConfig($this->className);
+     foreach ($new_config as $input_key => $input_val) {
+      
+      if(array_key_exists($input_key, $curr_config)){
+
+          if($new_config[$config_key] !== $curr_config[$config_key]){
+            return true;
+          }
+        }
+    }
+    return false;
+  }  
+/**
+ * Adjust appearance of form field
+ *
+ * @param  HookEvent $event
+ */
+  public function customInputfieldFormRender($event) {
+
+    //TODO: Make sure this is only affecting our Orders admin page
+    // Get the object the event occurred on, if needed
+    $InputfieldForm = $event->object;
+    bd("Make sure this is only affecting the ProcessOrdersPages page");
+    bd($InputfieldForm);
+
+    // Add class suffix for css to remove top margin and set button colour according to status
+    $return = $event->return;
+
+    if (strpos($return, "active-form") !== false) {
+      $class_suffix = "--pending";
+    } else {
+      $class_suffix = "--processed";
+    }
+    $event->return = str_replace(array("uk-margin-top", "ui-button"), array("", "ui-button ui-button" . $class_suffix), $return);
+  }
+
+  // Orders page
   public function ___execute() {
     // Live version
     if($this->input->post->submit) {
       
-      $form = $this->modules->get('InputfieldForm');
+      $form = $this->modules->get("InputfieldForm");
       $form->processInput($this->input->post);
 
       if($form->getErrors()) {
@@ -53,35 +238,35 @@ class ProcessOrderPages extends Process {
       } else {
         $operation = $this->sanitizer->text($this->input->post->submit);
         
-        if($operation === 'Processed') {
-          $order_num = $this->sanitizer->text($this->input->post['pending-order']);
-          $this->progressOrder($order_num, 'active');
-        } else if ($operation === 'Completed') {
-          $order_num = $this->sanitizer->text($this->input->post['active-order']);
-          $this->progressOrder($order_num, 'completed');
+        if($operation === "Processed") {
+          $order_num = $this->sanitizer->text($this->input->post["pending-order"]);
+          $this->progressOrder($order_num, "active");
+        } else if ($operation === "Completed") {
+          $order_num = $this->sanitizer->text($this->input->post["active-order"]);
+          $this->progressOrder($order_num, "completed");
         }
       }
     }
 
-    // Operations are 'Processed' and 'Completed'!!!
-    $pending_orders = $this->getOrdersPage('pending')->children();
-    $active_orders = $this->getOrdersPage('active')->children();
+    // Operations are "Processed" and "Completed"!!!
+    $pending_orders = $this->getOrdersPage("pending")->children();
+    $active_orders = $this->getOrdersPage("active")->children();
     $num_orders = 0;
     // Array to hold arrays of table rows
     $table_rows = array();
 
-    $table = $this->modules->get('MarkupAdminDataTable');
+    $table = $this->modules->get("MarkupAdminDataTable");
     $table->setEncodeEntities(false);
-    $table->headerRow(['Order Number', 'Product', 'Packs', 'Total', 'Customer', 'Status']);
+    $table->headerRow(["Order Number", "Product", "Packs", "Total", "Customer", "Status"]);
 
     foreach ($pending_orders as $user_orders) {
-      foreach ($this->getTableRows($user_orders, 'pending') as $row_out) {
+      foreach ($this->getTableRows($user_orders, "pending") as $row_out) {
         $num_orders++;
         $table->row($row_out);
       }
     }
     foreach ($active_orders as $user_orders) {
-      foreach ($this->getTableRows($user_orders, 'active') as $row_out) {
+      foreach ($this->getTableRows($user_orders, "active") as $row_out) {
         $num_orders++;
         $table->row($row_out);
       }
@@ -89,9 +274,35 @@ class ProcessOrderPages extends Process {
     $out = $table->render();
     
     if($num_orders === 0) {
-      $out .= "<p>There are no orders currently in the system";
+      $out .= "<p>There are no orders currently in the system</p>";
     }
+    $out .= "<h3>Danger - do not click this button unless you are sure you want to delete all your orders</h3>
+        <a href='./confirm' class='ui-button ui-state-default'>Remove data</a>";
     return $out;
+  }
+  public function ___executeConfirm() {
+  return "<h3>Are you absolutely sure you want to delete your order data?</h3>
+    <a href='./deleteorders' class='ui-button ui-state-default'>Yes, get on with it!</a>";
+  }
+  public function ___executeDeleteOrders() {
+
+    // $order_root_id = $this["order_root_location"];
+    // $order_root = $this->pages->get($order_root_id)->child("name=order-pages");
+
+    $order_root = $this->pages->get($this["order_root"]);
+
+    if($order_root->id) {
+
+      $order_root->delete(true);
+      return "<h3>Orders successfully removed</h3>
+      <p>You can now uninstall the " . $this->className . "module</p>";
+
+    } else {
+
+      return "<h3>Something went wrong</h3>
+      <p>The orders page could not be found</p>";
+
+    }
   }
  /**
  * Iterate through order pages, adding children to table rows 
@@ -106,42 +317,42 @@ class ProcessOrderPages extends Process {
 
     foreach ($user_orders as $order) {
       $order_number = $order->name;
-      $form = $this->modules->get('InputfieldForm');
-      $form->action = './';
-      $form->method = 'post';
+      $form = $this->modules->get("InputfieldForm");
+      $form->action = "./";
+      $form->method = "post";
 
-      // This attribute sets state of button - value is either 'processed-form' or 'completed-form'
-      $form->attr('id+name',"{$step}-form");
+      // This attribute sets state of button - value is either "processed-form" or "completed-form"
+      $form->attr("id+name","{$step}-form");
 
-      $field = $this->modules->get('InputfieldHidden');
-      $field->attr('id+name', "{$step}-order");
-      $field->set('value', $order_number);
+      $field = $this->modules->get("InputfieldHidden");
+      $field->attr("id+name", "{$step}-order");
+      $field->set("value", $order_number);
       $form->add($field);
 
-      $button = $this->modules->get('InputfieldSubmit');
-      $button->value = $step === 'pending' ? 'Processed' : 'Completed';
+      $button = $this->modules->get("InputfieldSubmit");
+      $button->value = $step === "pending" ? "Processed" : "Completed";
       $form->add($button);
 
-      $product_detail_lis = '';
-      $quantity_lis = '';
+      $product_detail_lis = "";
+      $quantity_lis = "";
       $total = 0;
 
       foreach ($order->children() as $line_item) {
-        $product_sku = $line_item[$this['f_sku_ref']];
+        $product_sku = $line_item[$this["f_sku_ref"]];
         $sku_uc = strtoupper($product_sku);
         $product_page = $this->pages->findOne("sku={$product_sku}");
         $product_title = $product_page->title;
         $product_price = $product_page->price;
-        $product_quantity = $line_item[$this['f_quantity']];
+        $product_quantity = $line_item[$this["f_quantity"]];
         $product_detail_lis .=  "<li><span class='order-details__sku'>{$sku_uc}</span> {$product_title}</li>";
         $quantity_lis .= "<li class='order-details__qty'>{$product_quantity}</li>";
         $total += $product_price * $product_quantity;
       }
       $order_total = $this->renderPrice( $total);
       $curr_user = $this->users->getCurrentUser();
-      $user_id = $line_item[$this['f_customer']];
+      $user_id = $line_item[$this["f_customer"]];
       $order_customer = $this->users->get($user_id);
-      $customer_name_set = $order_customer[$this['f_display_name']];
+      $customer_name_set = $order_customer[$this["f_display_name"]];
       $customer_display_name = $customer_name_set ? $customer_name_set : $order_customer->name;
       $debug_array = array(
         $order_number,  
@@ -159,167 +370,7 @@ class ProcessOrderPages extends Process {
     }
     return $table_rows;
   }
-///TODO: Is there a better way to call this function? We really need it in place before an item is added to the cart
-/**
- * Create all fields, templates and pages required by the module - 
- *   also emails superusers if installation has failed
- *
- * @param string $item The submitted form
- * @return object The new field
- */
-  public function completeInstallation($item) {
-
-    // Not including the sku field - it's up to the user to create and add to their products
-
-    $required_fields = array(
-      'f_customer'          =>  array('fieldtype'=>'FieldtypeText', 'label'=>'Customer'),
-      'f_sku_ref'           =>  array('fieldtype'=>'FieldtypeText', 'label'=>'Record of cart item sku'),
-      'f_quantity'          =>  array('fieldtype'=>'FieldtypeInteger', 'label'=>'Number of packs')
-    );
-    $required_templates = array(
-      't_line-item'         => array('t_parents' => array('t_cart-item', 't_order'), 't_fields'=>array('f_customer', 'f_sku_ref', 'f_quantity')),
-      't_cart-item'         => array('t_parents' => array('admin'), 't_children' => array('t_line-item')),
-      't_order'             => array('t_parents' => array('t_user-orders'), 't_children' => array('t_line-item')),
-      't_user-orders'        => array('t_parents' => array('t_step'), 't_children' => array('t_order')),
-      't_step'              => array('t_parents' => array('admin'), 't_children' => array('t_user-orders')),
-    );
-    $required_pages = array(
-      'cart-items'        =>  array('template' => 't_cart-item', 'parent'=>$this->config->url('admin') . 'orders/', 'title'=>'Cart Items'),
-      'pending-orders'    =>  array('template' => 't_step', 'parent'=>$this->config->url('admin') . 'orders/', 'title'=>'Pending Orders', ),
-      'active-orders'     =>  array('template' => 't_step', 'parent'=>$this->config->url('admin') . 'orders/', 'title'=>'Active Orders', ),
-      'completed-orders'  =>  array('template' => 't_step', 'parent'=>$this->config->url('admin') . 'orders/', 'title'=>'Completed Orders', )
-    );
-
-    $safeToInstall = $this->preflightInstall(array('fields' => $required_fields, 'templates' => $required_templates));
-    
-    // Handle errors or proceed
-    if($safeToInstall !== true) {
-      wire('log')->save('order-pages-debug', __LINE__);
-      wire('log')->save('order-pages-debug', print_r($safeToInstall, true));
-
-      // The addToCart() operation that called this method will fail. Send an email to notify superusers
-
-      $recipients = array();
-      $superusers = $this->users->get('roles=superuser');
-      foreach ($superusers as $sprusr) {
-        $recipients[] = $sprusr->email;
-      }
-      $pa_email = 'paul@primitive.co';
-      $from = 'Paul Ashby <{$pa_email}>';
-      $subject = 'Paperbird order cart issue';
-      $user_id = $this->users->getCurrentUser()->id;
-      $sku = $this->sanitizer->text($item->sku);
-      $quantity = $this->sanitizer->int($item->quantity);
-      $body_html = "<html><body><h1>Item could not be added to cart</h1><p>User '{$user_id}' attempted to add an item to their cart, but this operation could not be completed as the ProcessOrderPages module is misconfigured.</p><p>Please use the module's settings page to enter unique field and template names.</p><h2>Details of the cart item are as follows:</h2><dl><dt>SKU</dt><dd>{$sku}</dd><dt>Quantity</dt><dd>{$quantity}</dd></dl></body></html>";
-      $options = array('bodyHTML'=>$body_html, 'replyTo'=>$pa_email);
-
-      $this->mail->send($recipients, $from, $subject, $options);
-
-      //TODO: Test email remotely to check that email notification gets sent - for both the cart details (above) and the WireException (below)
-
-      // Process errors
-      $errs = $safeToInstall;
-
-      $err_mssg = "The ProcessOrderPages module has been configured with non-unique names. Please use its settings page to provide new names for the following: ";
-
-      if(count($errs['fields'])) {
-        $err_mssg .= implode(' field, ', $errs['fields']);
-        $err_mssg .= ' field. ';
-      }
-      if(count($errs['templates'])) {
-        $err_mssg .= implode(' template, ', $errs['templates']);
-        $err_mssg .= ' template. ';
-      }
-      throw new WireException($err_mssg);
-
-    } else {
-
-      foreach ($required_fields as $key => $spec) {
-        $this->makeField($key, $spec);
-      }
-      foreach ($required_templates as $key => $spec) {
-        $this->makeTemplate($key, $spec);
-      }
-      foreach ($required_templates as $key => $spec) {
-        $this->setTemplateFamily($key, $spec);
-      }
-      foreach ($required_pages as $key => $spec) {
-        $this->makePage($key, $spec);
-      }
-
-      // Add display_name field to user template
-      $f = new Field();
-      $f->type = $this->modules->get('FieldtypeText');
-      $f->name = $this['f_display_name'];
-      $f->label = 'Name displayed on orders';
-      $f->save();
-      $usr_template = $this->templates->get('user');
-      $ufg = $usr_template->fieldgroup;
-      $ufg->add($f);
-      $ufg->save();
-
-      // Set initial value of this field to user name 
-      foreach ($this->users->find("start=0") as $u) {
-          $u->of(false);
-          $u->set($this['f_display_name'], $u->name);
-          $u->save();
-      }
-
-      $data = $this->modules->getConfig('ProcessOrderPages');
-      $data['ready'] = 'true';
-      $this->modules->saveConfig('ProcessOrderPages', $data);
-
-    }
-  }  
-  public function ___uninstall() {
-
-    $module_elmts = array(
-      'pages' => array('cart-items', 'pending-orders', 'active-orders', 'completed-orders'),
-      'templates' => array('t_line-item', 't_cart-item', 't_order', 't_user-orders', 't_step'),
-      'fields' => array('f_display_name', 'f_customer', 'f_sku_ref', 'f_quantity')
-    );
-
-    if($this->preflightUninstall($module_elmts['pages'])) {
-
-      // Remove display_name field from user template
-      $rm_fld = wire('fields')->get($this['f_display_name']);
-      if($rm_fld !== null) {
-        $ufg = wire('fieldgroups')->get('user');
-        $ufg->remove($rm_fld);
-        $ufg->save();
-        wire('fields')->delete($rm_fld);
-      }
-
-      foreach ($module_elmts['pages'] as $pg) {
-        $selector = 'name=' . $pg;
-        $curr_p = $this->pages->findOne($selector);
-        if($curr_p->id) {
-          $curr_p->delete();
-        }
-      }
-      foreach ($module_elmts['templates'] as $t) {
-        $curr_t = $this->templates->get($this[$t]);
-        if( $curr_t !== null) {
-          $rm_fldgrp = $curr_t->fieldgroup;
-          wire('templates')->delete($curr_t);
-          wire('fieldgroups')->delete($rm_fldgrp);  
-        }
-      }
-      foreach($module_elmts['fields'] as $f) {
-        $curr_f = wire('fields')->get($this[$f]);
-        if($curr_f !== null) {
-          wire('fields')->delete($curr_f);
-        }
-      }
-
-      // Remove admin Order page - now that its child pages have been removed
-      parent::___uninstall();
-
-    } else {
-      throw new WireException("Unable to uninstall module as there are orders in progress. You can permanently delete this data from the " . $this->config->url('admin') . "orders page, then try again");
-    }
-  }
-
+// ----- Cart --------------------------------------------------------------------------
 /**
  * Add product to cart (creates a line-item page as child of /processwire/orders/cart-items)
  *
@@ -327,39 +378,36 @@ class ProcessOrderPages extends Process {
  * @return string The configured field name
  */
   public function addToCart($item) {
-    if( ! $this->ready) {
-      $this->completeInstallation($item);
-    }
-
+    
     $sku = $this->sanitizer->text($item->sku);
     $new_quantity = $this->sanitizer->int($item->quantity);
     
     // Is there an existing order for this product?
-    $f_customer = $this['f_customer'];
-    $f_sku_ref = $this['f_sku_ref'];
+    $f_customer = $this["f_customer"];
+    $f_sku_ref = $this["f_sku_ref"];
     $user_id = $this->users->getCurrentUser()->id;
-    $parent_selector = $this->config->url('admin') . 'orders/cart-items/';
+    $parent_selector = $this->getCartURL();
     $child_selector = "$f_customer=$user_id,$f_sku_ref=$sku";
     $exists_in_cart = $this->pages->get($parent_selector)->child($child_selector);
 
     if($exists_in_cart->id) {
       
       // Add to existing item
-      $sum = $new_quantity + $exists_in_cart[$this['f_quantity']];
+      $sum = $new_quantity + $exists_in_cart[$this["f_quantity"]];
       $exists_in_cart->of(false);
-      $exists_in_cart->set($this['f_quantity'], $sum);
+      $exists_in_cart->set($this["f_quantity"], $sum);
       $exists_in_cart->save();
 
     } else { 
 
       // Create a new item
-      $item_title = $sku . ': ' . $this->users->get($user_id)[$this['f_display_name']];
-      $item_data = array('title' => $item_title);
-      $item_data[$this['f_customer']] = $user_id;
-      $item_data[$this['f_sku_ref']] = $sku;
-      $item_data[$this['f_quantity']] = $new_quantity;
+      $item_title = $sku . ": " . $this->users->get($user_id)[$this["f_display_name"]];
+      $item_data = array("title" => $item_title);
+      $item_data[$this["f_customer"]] = $user_id;
+      $item_data[$this["f_sku_ref"]] = $sku;
+      $item_data[$this["f_quantity"]] = $new_quantity;
 
-      $cart_item = $this->wire('pages')->add($this['t_line-item'],  $this->config->url('admin') . 'orders/cart-items', $item_data);
+      $cart_item = $this->wire("pages")->add($this["t_line-item"],  $this->getCartURL(), $item_data);
     }
     return json_encode(array("success"=>true));
   }
@@ -373,14 +421,14 @@ class ProcessOrderPages extends Process {
     // Get the parent page for the new order
     $errors = array();
 
-    $orders_parent = $this->getOrdersPage('pending', $this->users->getCurrentUser()->id);
+    $orders_parent = $this->getOrdersPage("pending", $this->users->getCurrentUser()->id);
     
     if($orders_parent) {
 
       $order_number = $this->getOrderNum();
 
       // Create the order
-      $order_page = $this-> makePage($order_number, array('template' => 't_order', 'parent'=>$orders_parent->path(), 'title'=>$order_number));
+      $order_page = $this-> makePage($order_number, array("template" => "t_order", "parent"=>$orders_parent->path(), "title"=>$order_number));
       $cart_items = $this->getCartItems();
 
       foreach ($cart_items as $item) {
@@ -401,13 +449,13 @@ class ProcessOrderPages extends Process {
  * @return boolean
  */
   protected function progressOrder($order_num, $order_step) {
-    $order_selector = "template=" . $this['t_order'] . ",name={$order_num}";
-    $admin_url = $this->config->url('admin');
+    $order_selector = "template=" . $this["t_order"] . ",name={$order_num}";
+    $admin_url = $this->config->url("admin");
     $order_pg = $this->pages->findOne($order_selector);
     
     if($order_pg->id){
       // Get the customer
-      $customer = $order_pg->children()->first()[$this['f_customer']];
+      $customer = $order_pg->children()->first()[$this["f_customer"]];
       $next_step = $this->getOrdersPage($order_step, $customer);
       $order_pg->of(false);
       $order_pg->parent = $next_step;
@@ -425,8 +473,8 @@ class ProcessOrderPages extends Process {
  */
   protected function getOrdersPage($order_step, $user_id = null) {
     
-    $admin_url = $this->config->url('admin');
-    $parent_path = "{$admin_url}orders/{$order_step}-orders/";
+    $admin_url = $this->config->url("admin");
+    $parent_path = $this["order_root"] . "/{$order_step}-orders/";
     $parent_selector = "$parent_path,include=all"; 
     $order_parent_name =  "{$user_id}_orders";
     if($user_id) {
@@ -437,12 +485,12 @@ class ProcessOrderPages extends Process {
         return $user_order_page;
       }
       // No orders for this user - make a new page within pending orders
-      return $this->makePage($order_parent_name, array('template' => 't_user-orders', 'parent'=>$parent_path, 'title'=>$order_parent_name));
+      return $this->makePage($order_parent_name, array("template" => "t_user-orders", "parent"=>$parent_path, "title"=>$order_parent_name));
     }
     // All orders for given step
     return $this->pages->get($parent_path)->children();
   }
-/**
+  /**
  * Remove line item from cart
  *
  * @param string  $sku The item to remove
@@ -453,9 +501,9 @@ class ProcessOrderPages extends Process {
     if($cart_item->id) {
       
       $cart_item->delete(true);
-      return json_encode(array('success'=>true, 'cart'=>$this->renderCart(true)));  
+      return json_encode(array("success"=>true, "cart"=>$this->renderCart(true)));  
     }
-    return json_encode(array('error'=>"The item could not be found"));
+    return json_encode(array("error"=>"The item could not be found"));
   }
 /**
  * Change quantity of cart item
@@ -471,11 +519,11 @@ class ProcessOrderPages extends Process {
 
     if($cart_item->id) {
         $cart_item->of(false);
-        $cart_item->set($this['f_quantity'], (int)$qtys);
+        $cart_item->set($this["f_quantity"], (int)$qtys);
         $cart_item->save();
-        return json_encode(array('success'=>true, 'cart'=>$this->renderCart(true)));  
+        return json_encode(array("success"=>true, "cart"=>$this->renderCart(true)));  
     }
-    return json_encode(array('error'=>"The item could not be found"));
+    return json_encode(array("error"=>"The item could not be found"));
   }
 /**
  * Convert an integer representing GB pence to a GBP string 
@@ -485,7 +533,7 @@ class ProcessOrderPages extends Process {
  */
   public function renderPrice($pence) {
 
-    return '£' . number_format($pence/100, 2);
+    return "£" . number_format($pence/100, 2);
   }
 /**
  * Generate HTML markup for current user's cart
@@ -496,9 +544,9 @@ class ProcessOrderPages extends Process {
   public function renderCart($omitContainer = false) {
 
     // Store field and template names in variables for markup
-    $f_sku = $this['f_sku'];
-    $f_sku_ref = $this['f_sku_ref'];
-    $f_quantity = $this['f_quantity'];
+    $f_sku = $this["f_sku"];
+    $f_sku_ref = $this["f_sku_ref"];
+    $f_quantity = $this["f_quantity"];
     $open = $omitContainer ? "" : "<div class='cart-items'>";
     $close = $omitContainer ? "" : "</div>";
 
@@ -544,9 +592,9 @@ class ProcessOrderPages extends Process {
 
     $skus = $this->sanitizer->text($sku);
     $user_id = $this->users->getCurrentUser()->id;
-    $f_customer = $this['f_customer'];
-    $f_sku_ref = $this['f_sku_ref'];
-    $admin_url = $this->config->url('admin');
+    $f_customer = $this["f_customer"];
+    $f_sku_ref = $this["f_sku_ref"];
+    $admin_url = $this->config->url("admin");
     $parent_selector = "{$admin_url}orders/cart-items/, include=all";
     $child_selector = "{$f_customer}={$user_id}, {$f_sku_ref}={$skus}, include=all";
     $cart_item = $this->pages->findOne($parent_selector)->child($child_selector);
@@ -563,10 +611,18 @@ class ProcessOrderPages extends Process {
  */
   protected function getCartItems() {
     $user_id = $this->users->getCurrentUser()->id;
-    $admin_url = $this->config->url('admin');
-    $t_line_item = $this['t_line-item'];
-    $f_customer = $this['f_customer'];
-    return $this->pages->findOne("{$admin_url}orders/cart-items/, include=all")->children("template={$t_line_item}, {$f_customer}={$user_id}, include=all");
+    $admin_url = $this->config->url("admin");
+    $t_line_item = $this["t_line-item"];
+    $f_customer = $this["f_customer"];
+    return $this->pages->findOne($this["order_root"] . ", include=all")->children("template={$t_line_item}, {$f_customer}={$user_id}, include=all");
+  }
+/**
+ * Get the path of the cart
+ *
+ * @return string
+ */
+  public function getCartURL() {
+    return $this["order_root"] . "/cart-items/";
   }
 /**
  * Get order number then increment in db
@@ -575,15 +631,14 @@ class ProcessOrderPages extends Process {
  */
   protected function getOrderNum() {
 
-    $data = $this->modules->getConfig('ProcessOrderPages');
-    $order_num = $this->sanitizer->text($data['order_num']);
+    $data = $this->modules->getConfig("ProcessOrderPages");
+    $order_num = $this->sanitizer->text($data["order_num"]);
     $this_order_num = $order_num;
     $order_num++;
-    $data['order_num'] = $this->sanitizer->text($order_num);
-    $this->modules->saveConfig('ProcessOrderPages', $data);
+    $data["order_num"] = $this->sanitizer->text($order_num);
+    $this->modules->saveConfig("ProcessOrderPages", $data);
     return $this_order_num;
   }
-
 /**
  * Set order number
  *
@@ -592,11 +647,10 @@ class ProcessOrderPages extends Process {
  */
   protected function setOrderNum($val) {
 
-    $data = $this->modules->getConfig('ProcessOrderPages');
-    $data['order_num'] = $val;
-    return $this->modules->saveConfig('ProcessOrderPages', $data);
+    $data = $this->modules->getConfig("ProcessOrderPages");
+    $data["order_num"] = $val;
+    return $this->modules->saveConfig("ProcessOrderPages", $data);
   }
-
 /**
  * Increment order number
  *
@@ -604,175 +658,11 @@ class ProcessOrderPages extends Process {
  */
   protected function incrementOrderNum() {
 
-    $data = $this->modules->getConfig('ProcessOrderPages');
-    $order_num = $this->sanitizer->text($data['order_num']);
+    $data = $this->modules->getConfig("ProcessOrderPages");
+    $order_num = $this->sanitizer->text($data["order_num"]);
     $order_num++;
-    $data['order_num'] = $this->sanitizer->text($order_num);
-    $this->modules->saveConfig('ProcessOrderPages', $data);
-    return $data['order_num'];
+    $data["order_num"] = $this->sanitizer->text($order_num);
+    $this->modules->saveConfig("ProcessOrderPages", $data);
+    return $data["order_num"];
   }
-
-/**
- * Check there are no naming collisions before completing installation
- *
- * @param array $module_elmts Array of elements to check ['fields' Array of strings , 'templates' Array of strings]
- * @return array of errors or boolean true
- */
-  protected function preflightInstall($module_elmts) {
-
-    $errors = array(
-      'fields' => array(),
-      'templates' => array()
-    );
-
-    // Check if fields exist
-    foreach($module_elmts['fields'] as $f => $spec) {
-      $curr_f = wire('fields')->get($this[$f]);
-      if($curr_f !== null) {
-        $errors['fields'][] = $this[$f];
-      }
-    }
-
-    foreach ($module_elmts['templates'] as $t => $spec) {
-      $curr_t = $this->templates->get($this[$t]);
-      if( $curr_t !== null) {
-        $errors['templates'][] = $this[$t];
-      }
-    }
-    if(count($errors['fields']) || count($errors['templates'])) {
-      return $errors;
-    }
-    return true;
-  }
-/**
- * Check it's safe to delete provided items
- *
- * @param array $ps Names of pages to check
- * @return boolean
- */
-  protected function preflightUninstall($ps) {
-
-    // Check for ongoing orders
-    foreach ($ps as $pg) {
-      $selector = 'name=' . $pg;
-      $curr_p = $this->pages->findOne($selector);
-      if($curr_p->id){
-        if($curr_p->numChildren()) {
-          return false;
-        }
-      }
-    }
-    return true;
-  }
-/**
- * Make a field
- *
- * @param string $key Name of field
- * @param array $spec [string 'fieldtype', string 'label']
- * @return object The new field
- */
-  protected function makeField($key, $spec) {
-    $f = new Field();
-    $f->type = $this->modules->get($spec['fieldtype']);
-    $f->name = $this[$key]; // From config
-    $f->label = $spec['label'];
-    $f->save();
-    return $f;
-  }
-/**
- * Make a template
- *
- * @param string $key name of config input field
- * @param array $spec [array $t_parents [string Template name], array $t_children [string Template name], $array T_field $array [string Field name]]
- * @return object The new template
- */
-  protected function makeTemplate($key, $spec) {
-
-    $fg_name = $this[$key]; // From config
-    if(! $fg_name) {
-      throw new WireException(__LINE__ . ": Unable to create fieldgroup as name was not provided");
-    }
-    $fg = new Fieldgroup();
-    $fg->name = str_replace('t_', 'fg_', $fg_name);
-    $fg->add($this->fields->get('title'));
-    if($key === 't_line-item') {
-      foreach ($spec['t_fields'] as $fkey) {
-        $f_name = $this[$fkey]; // From config
-        if(! $f_name) {
-          throw new WireException(__LINE__ . ": Unable to add field as name was not provided");
-        }
-        $fg->add($f_name);
-      }
-    }
-
-    $fg->save();
-
-    $t_name = $this[$key];
-    if(! $t_name) {
-      throw new WireException(__LINE__ . ": Unable to create template as name was not provided");
-    }
-    $t = new Template();
-    $t->name = $t_name;
-    $t->fieldgroup = $fg;
-    $t->save();
-    return $t;
-  }
-/**
- * Apply family settings to template to restrict permitted parent and child templates
- *
- * @param string $key name of config input field
- * @param array $spec [array $t_parents [string Template name], array $t_children [string Template name], $array T_field $array [string Field name]]
- * @return boolean
- */
-  protected function setTemplateFamily($key, $spec) {
-
-    $t_name = $this[$key];
-    if(! $t_name) {
-      $this->error("Unable to set template family", Notice::logOnly);
-      return false;
-    }
-    $t = $this->templates->get($t_name);
-    if(! $t->id) {
-      $this->error("Unable to set family for template {$t_name}", Notice::logOnly);
-      return false;
-    }
-    
-    if(array_key_exists('t_parents', $spec)) {
-      $parent_template_names = array();
-      foreach ($spec['t_parents'] as $key => $input_name) {
-        $parent_template_names[] = $this[$input_name];
-      }
-      // Set permitted parent templates
-      $t->parentTemplates($parent_template_names);
-    }
-
-    if(array_key_exists('t_children', $spec)) {
-      $child_template_names = array();
-      foreach ($spec['t_children'] as $key => $input_name) {
-        $child_template_names[] = $this[$input_name];
-      }
-      // Set permitted parent templates
-      $t->childTemplates($child_template_names);
-    }
-    $t->save();
-    return true;
-  }
-/**
- * Create a new page
- *
- * @param string $key Name of page
- * @param array $spec [string 'template' - name of template, string 'parent' - path of parent page, string 'title']
- * @return Object The new page
- */
-  protected function makePage($key, $spec) {
-    $p = $this->wire(new Page());
-    $p->template = $this[$spec['template']];
-    $p->parent = wire('pages')->get($spec['parent']);
-    $p->name = $key; // Name used in url
-    $p->title = $spec['title'];
-    $p->save();
-
-    return $p;
-  }
-
 }
