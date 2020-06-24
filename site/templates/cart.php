@@ -1,6 +1,6 @@
 <?php namespace ProcessWire;
 
-$cart = $modules->get("ProcessOrderPages");
+$cart = $this->modules->get("OrderCart");
 
 // Process checkout requests
 if($input->post->qtychange) {
