@@ -14,6 +14,7 @@ site/config.php
 /site/modules/Helloworld/*
 /site/modules/InputfieldCKEditor/*
 site/modules/PageMaker/*
+site/modules/OrderCart/*
 site/ready.php
 /site/modules/ProcessOrderPages/Notes.txt
 site/modules/ProcessExportProfile-master/*
