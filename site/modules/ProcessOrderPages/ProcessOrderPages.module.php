@@ -10,10 +10,10 @@ class ProcessOrderPages extends Process {
       "version" => 1,
       "singular" => true,
       'autoload' => true,
-      "requires" => [
-        "FieldtypeTextUnique>=1.0.0", "PageMaker>=0.0.1", "OrderCart>=0.0.1"
+      "installs" => [
+        "PageMaker>=0.0.1",
+        "OrderCart>=0.0.1"
       ],
-
       // page that you want created to execute this module
       "page" => [
         // your page will be online at /processwire/yourname/
@@ -174,6 +174,7 @@ class ProcessOrderPages extends Process {
         $ufg->save();
         wire("fields")->delete($rm_fld);
       }
+      parent::uninstall();
     } 
   }
 /**
