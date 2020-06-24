@@ -13,6 +13,8 @@ site/config.php
 /site/modules/FieldtypeTextUnique/*
 /site/modules/Helloworld/*
 /site/modules/InputfieldCKEditor/*
+site/modules/PageMaker/*
+site/ready.php
 /site/modules/ProcessOrderPages/Notes.txt
 site/modules/ProcessExportProfile-master/*
 
