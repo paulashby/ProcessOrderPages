@@ -44,10 +44,10 @@ class ProcessOrderPages extends Process {
  * @param  HookEvent $event
  */
   public function customSaveConfig($event) {
-    
+ 
     $class = $event->arguments(0);
     if($class !== $this->className) return;
-   
+
     // Config input
     $data = $event->arguments(1);
     $modules = $event->object;
@@ -125,12 +125,20 @@ class ProcessOrderPages extends Process {
         }
       }
       $event->arguments(1, $data);
-    } else if($this->configDiff($data)) {
-      
-        // We don't want to change anything once installed, so show warning and submit existing data if anything has been changed
-        $this->session->warning("Names cannot be changed after installation. If you really need to rename, you can reinstall the module, but be aware that this will mean losing the order data currently in the system");
+    } else{
 
-      }  
+      // false or the current config returned
+      $revertConfig = $this->configDiffers($data);
+
+      if($revertConfig !== false) {
+            
+        // We don't want to change anything once installed, so show warning and submit existing data if anything has been changed
+        $this->session->error("Names cannot be changed after installation. If you really need to rename, you can reinstall the module, but be aware that this will mean losing the order data currently in the system");
+
+        // Revert to previous values
+        $event->arguments(1, $revertConfig);
+      }
+    }    
   }
 /**
  * Custom uninstall 
@@ -171,23 +179,24 @@ class ProcessOrderPages extends Process {
  * Check for config naming collisions between common config elements
  *
  * @param Array $new_config New config array to check
- * @return Boolean - do common config entries differ?
+ * @return Boolean false or the current config
  */
-  public function configDiff($new_config) {
-bd($new_config);
-    $curr_config = $this->modules->getConfig($this->className);
-    bd($curr_config);
-     foreach ($new_config as $input_key => $input_val) {
-      bd($this[$input_key]);
-      if(array_key_exists($input_key, $curr_config)){
+  public function configDiffers($new_config) {
 
-          if($new_config[$input_key] !== $curr_config[$input_key]){
-            return true;
+    // Get the whole config as we've added more settings than just the user-submitted names
+    $curr_config = $this->modules->getConfig($this->className);
+
+    foreach ($new_config as $key => $val) {
+
+      if(array_key_exists($key, $curr_config)){
+
+          if($new_config[$key] !== $curr_config[$key]){
+            return $curr_config;
           }
         }
     }
     return false;
-  }  
+  } 
 /**
  * Adjust appearance of form field
  *
