@@ -11,7 +11,7 @@ class ProcessOrderPages extends Process {
       "singular" => true,
       'autoload' => true,
       "requires" => [
-        "FieldtypeTextUnique>=1.0.0", "PageMaker>=0.0.1"
+        "FieldtypeTextUnique>=1.0.0", "PageMaker>=0.0.1", "OrderCart>=0.0.1"
       ],
 
       // page that you want created to execute this module
@@ -198,8 +198,6 @@ bd($new_config);
     //TODO: Make sure this is only affecting our Orders admin page
     // Get the object the event occurred on, if needed
     $InputfieldForm = $event->object;
-    bd("Make sure this is only affecting the ProcessOrdersPages page");
-    bd($InputfieldForm);
 
     // Add class suffix for css to remove top margin and set button colour according to status
     $return = $event->return;
@@ -209,12 +207,15 @@ bd($new_config);
     } else {
       $class_suffix = "--processed";
     }
-    $event->return = str_replace(array("uk-margin-top", "ui-button"), array("", "ui-button ui-button" . $class_suffix), $return);
+    ///TODO: Do we need this field adjustment? It messes the appearance of all the admin form buttons, so would have to make it more targetted
+    // $event->return = str_replace(array("uk-margin-top", "ui-button"), array("", "ui-button ui-button" . $class_suffix), $return);
   }
 
   // Orders page
   public function ___execute() {
-    // Live version
+
+    $cart = $this->modules->get("OrderCart");
+
     if($this->input->post->submit) {
       
       $form = $this->modules->get("InputfieldForm");
@@ -227,17 +228,17 @@ bd($new_config);
         
         if($operation === "Processed") {
           $order_num = $this->sanitizer->text($this->input->post["pending-order"]);
-          $this->progressOrder($order_num, "active");
+          $cart->progressOrder($order_num, "active");
         } else if ($operation === "Completed") {
           $order_num = $this->sanitizer->text($this->input->post["active-order"]);
-          $this->progressOrder($order_num, "completed");
+          $cart->progressOrder($order_num, "completed");
         }
       }
     }
 
     // Operations are "Processed" and "Completed"!!!
-    $pending_orders = $this->getOrdersPage("pending")->children();
-    $active_orders = $this->getOrdersPage("active")->children();
+    $pending_orders = $cart->getOrdersPage("pending")->children();
+    $active_orders = $cart->getOrdersPage("active")->children();
     $num_orders = 0;
     // Array to hold arrays of table rows
     $table_rows = array();
@@ -247,13 +248,13 @@ bd($new_config);
     $table->headerRow(["Order Number", "Product", "Packs", "Total", "Customer", "Status"]);
 
     foreach ($pending_orders as $user_orders) {
-      foreach ($this->getTableRows($user_orders, "pending") as $row_out) {
+      foreach ($this->getTableRows($user_orders, "pending", $cart) as $row_out) {
         $num_orders++;
         $table->row($row_out);
       }
     }
     foreach ($active_orders as $user_orders) {
-      foreach ($this->getTableRows($user_orders, "active") as $row_out) {
+      foreach ($this->getTableRows($user_orders, "active", $cart) as $row_out) {
         $num_orders++;
         $table->row($row_out);
       }
@@ -298,7 +299,7 @@ bd($new_config);
  * @param string $step The order status
  * @return array of table rows
  */ 
-  protected function getTableRows($user_orders, $step) {
+  protected function getTableRows($user_orders, $step, $cart) {
 
     $table_rows = array();
 
@@ -335,7 +336,7 @@ bd($new_config);
         $quantity_lis .= "<li class='order-details__qty'>{$product_quantity}</li>";
         $total += $product_price * $product_quantity;
       }
-      $order_total = $this->renderPrice( $total);
+      $order_total = $cart->renderPrice( $total);
       $curr_user = $this->users->getCurrentUser();
       $user_id = $line_item[$this["f_customer"]];
       $order_customer = $this->users->get($user_id);
