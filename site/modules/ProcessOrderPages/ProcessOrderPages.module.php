@@ -44,10 +44,11 @@ class ProcessOrderPages extends Process {
  * @param  HookEvent $event
  */
   public function customSaveConfig($event) {
- 
-    $class = $event->arguments(0);
-    if($class !== $this->className) return;
 
+    $class = $event->arguments(0);
+    $page_path = $this->page->path();
+    if($class !== $this->className || $page_path !== "/processwire/module/") return;
+    
     // Config input
     $data = $event->arguments(1);
     $modules = $event->object;
@@ -204,20 +205,19 @@ class ProcessOrderPages extends Process {
  */
   public function customInputfieldFormRender($event) {
 
-    //TODO: Make sure this is only affecting our Orders admin page
-    // Get the object the event occurred on, if needed
-    $InputfieldForm = $event->object;
+    if($this->page->path === '/processwire/orders/'){
+      
+      // Add class suffix for css to remove top margin and set button colour according to status
+      $return = $event->return;
 
-    // Add class suffix for css to remove top margin and set button colour according to status
-    $return = $event->return;
+      if (strpos($return, "active-form") !== false) {
+        $class_suffix = "--pending";
+      } else {
+        $class_suffix = "--processed";
+      }
+      $event->return = str_replace(array("uk-margin-top", "ui-button"), array("", "ui-button ui-button" . $class_suffix), $return);
+      }
 
-    if (strpos($return, "active-form") !== false) {
-      $class_suffix = "--pending";
-    } else {
-      $class_suffix = "--processed";
-    }
-    ///TODO: Do we need this field adjustment? It messes the appearance of all the admin form buttons, so would have to make it more targetted
-    // $event->return = str_replace(array("uk-margin-top", "ui-button"), array("", "ui-button ui-button" . $class_suffix), $return);
   }
 
   // Orders page
