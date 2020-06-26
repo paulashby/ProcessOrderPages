@@ -69,31 +69,31 @@ class ProcessOrderPages extends Process {
         $order_root = $this->pages->get("/");
       }
       
+      // Assign field, template and family settings from config
       $pgs = array(
         "fields" => array(
-          "f_customer" => array("fieldtype"=>"FieldtypeText", "label"=>"Customer"),
-          "f_sku_ref" => array("fieldtype"=>"FieldtypeText", "label"=>"Record of cart item sku"),
-          "f_quantity" => array("fieldtype"=>"FieldtypeInteger", "label"=>"Number of packs")
+          $data["f_customer"] => array("fieldtype"=>"FieldtypeText", "label"=>"Customer"),
+          $data["f_sku_ref"] => array("fieldtype"=>"FieldtypeText", "label"=>"Record of cart item sku"),
+          $data["f_quantity"] => array("fieldtype"=>"FieldtypeInteger", "label"=>"Number of packs")
         ),
         "templates" => array(
-          "t_line-item" => array("t_parents" => array("t_cart-item", "t_order"), "t_fields"=>array("f_customer", "f_sku_ref", "f_quantity")),
-          "t_cart-item" => array("t_parents" => array("t_section"), "t_children" => array("t_line-item")),
-          "t_order" => array("t_parents" => array("t_user-orders"), "t_children" => array("t_line-item")),
-          "t_user-orders" => array("t_parents" => array("t_step"), "t_children" => array("t_order")),
-          "t_step" => array("t_parents" => array("t_section"), "t_children" => array("t_user-orders")),
-          "t_section" => array("t_children" => array("t_section", "t_cart-item"))
+          $data["t_line_item"] => array("t_parents" => array($data["t_cart_item"], $data["t_order"]), "t_fields"=>array($data["f_customer"], $data["f_sku_ref"], $data["f_quantity"])),
+          $data["t_cart_item"] => array("t_parents" => array($data["t_section"]), "t_children" => array($data["t_line_item"])),
+          $data["t_order"] => array("t_parents" => array($data["t_user_orders"]), "t_children" => array($data["t_line_item"])),
+          $data["t_user_orders"] => array("t_parents" => array($data["t_step"]), "t_children" => array($data["t_order"])),
+          $data["t_step"] => array("t_parents" => array($data["t_section"]), "t_children" => array($data["t_user_orders"])),
+          $data["t_section"] => array("t_children" => array($data["t_section"], $data["t_cart_item"]))
         ),
         "pages" => array(
-          "order-pages" => array("template" => "t_section", "parent"=>$order_root_path, "title"=>"Order Pages"),
-          "cart-items" => array("template" => "t_cart-item", "parent"=>"{$order_root_path}order-pages/", "title"=>"Cart Items"),
-          "pending-orders" => array("template" => "t_step", "parent"=>"{$order_root_path}order-pages/", "title"=>"Pending Orders", ),
-          "active-orders" => array("template" => "t_step", "parent"=>"{$order_root_path}order-pages/", "title"=>"Active Orders", ),
-          "completed-orders" => array("template" => "t_step", "parent"=>"{$order_root_path}order-pages/", "title"=>"Completed Orders", )
+          "order-pages" => array("template" => $data["t_section"], "parent"=>$order_root_path, "title"=>"Order Pages"),
+          "cart-items" => array("template" => $data["t_cart_item"], "parent"=>"{$order_root_path}order-pages/", "title"=>"Cart Items"),
+          "pending-orders" => array("template" => $data["t_step"], "parent"=>"{$order_root_path}order-pages/", "title"=>"Pending Orders", ),
+          "active-orders" => array("template" => $data["t_step"], "parent"=>"{$order_root_path}order-pages/", "title"=>"Active Orders", ),
+          "completed-orders" => array("template" => $data["t_step"], "parent"=>"{$order_root_path}order-pages/", "title"=>"Completed Orders", )
         )
       );
 
-      //TODO: We're letting PageMaker map the handles to names. We ought to do this here so PageMaker just deals with actual names
-      $made_pages = $page_maker->makePages($pgs, $data);
+      $made_pages = $page_maker->makePages($pgs);
       if($made_pages !== true){
         
         foreach ($made_pages as $e) {
