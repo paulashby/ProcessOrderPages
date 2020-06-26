@@ -246,7 +246,10 @@ class ProcessOrderPages extends Process {
       } else {
         $class_suffix = "--processed";
       }
-      $event->return = str_replace(array("uk-margin-top", "ui-button"), array("", "ui-button ui-button--pop ui-button" . $class_suffix), $return);
+      
+      $event->return = str_replace(
+        array("uk-margin-top", "ui-button ui-widget ui-state-default ui-corner-all"), 
+        array("", "ui-button ui-button$class_suffix ui-widget ui-state-default ui-corner-all"), $return);
     }
 
   }
@@ -306,7 +309,7 @@ class ProcessOrderPages extends Process {
     if($num_orders === 0) {
       $out .= "<p>There are no orders currently in the system</p>";
     } else {
-      $out .= "<small class='buttons remove-bttn'><a href='./confirm' class='ui-button ui-button--pop ui-state-default '>Remove all order data</a></small>";
+      $out .= "<small class='buttons completed-bttn'><a href='./confirm' class='ui-button ui-button--pop ui-state-default '>Completed Orders</a></small><small class='buttons remove-bttn'><a href='./confirm' class='ui-button ui-button--pop ui-button--remove ui-state-default '>Remove all order data</a></small>";
     }
     return $out;
   }
