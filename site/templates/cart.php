@@ -25,7 +25,7 @@ $out = "<!DOCTYPE html>
 	<script src='" . $config->urls->templates . "scripts/cart.js'></script>
 </head>
 <body>
-<p><a href='" . $pages->get('/products/')->url() . "'>Continue shopping</a></p>";
+<p><a href='" . $pages->get('/cards/')->url() . "'>Continue shopping</a></p>";
 	$out .= $cart->renderCart();
 	$out .= "
 	</body>
