@@ -10,10 +10,7 @@ class ProcessOrderPages extends Process {
       "version" => 1,
       "singular" => true,
       'autoload' => true,
-      "installs" => [
-        "PageMaker>=0.0.1",
-        "OrderCart>=0.0.1"
-      ],
+      "installs" => ["OrderCart", "PageMaker"],
       // page that you want created to execute this module
       "page" => [
         // your page will be online at /processwire/yourname/
@@ -52,7 +49,7 @@ class ProcessOrderPages extends Process {
     // Config input
     $data = $event->arguments(1);
     $modules = $event->object;
-    $page_maker = $modules->get("PageMaker");
+    $page_maker = $this->modules->get("PageMaker");
     $configured = array_key_exists("configured", $data);
 
     if( ! $configured) {
@@ -95,6 +92,7 @@ class ProcessOrderPages extends Process {
         )
       );
 
+      //TODO: We're letting PageMaker map the handles to names. We ought to do this here so PageMaker just deals with actual names
       $made_pages = $page_maker->makePages($pgs, $data);
       if($made_pages !== true){
         
@@ -152,18 +150,20 @@ class ProcessOrderPages extends Process {
     if($class !== $this->className) return;
 
     $page_maker = $this->modules->get("PageMaker");
-    $pages_removed = $page_maker->removePages();
+    $page_maker_config = $this->modules->getConfig("PageMaker"); 
+    $order_system_pages = $page_maker_config["setup"]["pages"];
 
-    if($pages_removed !== true) {
-      if(gettype($pages_removed) === "string"){
-        // PageMaker files still on system - abort uninstall
-        $this->error($pages_removed);
-        $event->replace = true; // prevent uninstall
-        $this->session->redirect("./edit?name=$class"); 
-      } else {
-        // No pages on system, but some fields or templates remain - PageMaker has shown errors
-      }
+    // Check for live orders before uninstalling
+    if($this->inUse($order_system_pages)) { // There are active orders
+      
+      // PageMaker files still on system - abort uninstall
+      $this->error("The module could not be uninstalled as live data exists. If you want to proceed, you can remove all order data from the Admin/Orders page and try again.");
+      $event->replace = true; // prevent uninstall
+      $this->session->redirect("./edit?name=$class"); 
+
     } else {
+
+      // Safe to proceed
       
       // Remove display_name field from user template
       $f_name = $this["f_display_name"];
@@ -174,8 +174,38 @@ class ProcessOrderPages extends Process {
         $ufg->save();
         wire("fields")->delete($rm_fld);
       }
+
+      $page_maker->removePages(true, false);
+
       parent::uninstall();
     } 
+  }
+/**
+ * Check it's safe to delete provided pages
+ *
+ * @param array $ps Names of pages to check
+ * @return boolean true if pages are safe to delete
+ */
+  protected function inUse($ps) {
+
+    // Check for ongoing orders
+    foreach ($ps as $pg => $spec) {
+      $selector = 'name=' . $pg;
+      $curr_p = $this->pages->findOne($selector);
+
+      if($curr_p->id === 0){
+
+        // Removed already - presumably via button on /admin/orders/
+        return false; 
+      }
+      $curr_p->numChildren();
+      // Exclude Order Pages as it's the parent page of the system and wil always have children
+      if($pg !== "order-pages" && $curr_p->numChildren()) {
+
+        return true;
+      }
+    }
+    return false;
   }
 /**
  * Check for config naming collisions between common config elements
@@ -183,7 +213,7 @@ class ProcessOrderPages extends Process {
  * @param Array $new_config New config array to check
  * @return Boolean false or the current config
  */
-  public function configDiffers($new_config) {
+  protected function configDiffers($new_config) {
 
     // Get the whole config as we've added more settings than just the user-submitted names
     $curr_config = $this->modules->getConfig($this->className);
@@ -216,13 +246,15 @@ class ProcessOrderPages extends Process {
       } else {
         $class_suffix = "--processed";
       }
-      $event->return = str_replace(array("uk-margin-top", "ui-button"), array("", "ui-button ui-button" . $class_suffix), $return);
-      }
+      $event->return = str_replace(array("uk-margin-top", "ui-button"), array("", "ui-button ui-button--pop ui-button" . $class_suffix), $return);
+    }
 
   }
 
   // Orders page
   public function ___execute() {
+
+    //TODO: Add page for completed orders
 
     $cart = $this->modules->get("OrderCart");
 
@@ -273,13 +305,14 @@ class ProcessOrderPages extends Process {
     
     if($num_orders === 0) {
       $out .= "<p>There are no orders currently in the system</p>";
+    } else {
+      $out .= "<small class='buttons remove-bttn'><a href='./confirm' class='ui-button ui-button--pop ui-state-default '>Remove all order data</a></small>";
     }
-    $out .= "<h3>Danger - do not click this button unless you are sure you want to delete all your orders</h3>
-        <a href='./confirm' class='ui-button ui-state-default'>Remove data</a>";
     return $out;
   }
   public function ___executeConfirm() {
-  return "<h3>Are you absolutely sure you want to delete your order data?</h3>
+  return "<h4>Are you absolutely sure you want to delete your order data?</h4>
+    <a href='./' class='ui-button ui-button--pop ui-button--cancel ui-state-default'>Cancel</a>
     <a href='./deleteorders' class='ui-button ui-state-default'>Yes, get on with it!</a>";
   }
   public function ___executeDeleteOrders() {
