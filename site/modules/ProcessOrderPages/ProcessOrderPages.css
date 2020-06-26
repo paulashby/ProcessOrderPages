@@ -1,10 +1,16 @@
+.pw-content .remove-bttn .ui-button--pop {
+	background-color: #6d7a8a;;
+}
 .ui-button.ui-button--processed,
 .ui-button--processed .ui-button.ui-button--processed-text {
 	background-color: #ca5e5e;
 }
-.ui-button--pending .ui-button,
-.ui-button--processed .ui-button {
-	padding: 0;
+.ui-button.ui-button--pending,
+.ui-button--pending .ui-button.ui-button--pending-text {
+	background-color: #3eb998;
+}
+.ui-button--pop.ui-button--cancel {
+	background-color: #1c2836;
 }
 .order-details {
 	font-style: italic;
@@ -16,6 +22,5 @@
 	font-weight: bold;
 }
 .order-details__qty {
-	/*color: #777676;*/
 	font-style: normal;
 }
