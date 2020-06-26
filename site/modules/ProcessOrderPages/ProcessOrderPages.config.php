@@ -81,7 +81,7 @@ $config = array(
 		"required" => true 
 	),
 	"lineItemTemplate" => array(
-		"name"=> "t_line-item",
+		"name"=> "t_line_item",
 		"type" => "text", 
 		"label" => "Name for line item template",
 		"description" => "Please use a unique name if this collides with an existing template name. Template names may use letters (a-z A-Z), numbers (0-9), hyphens and underscores. Lowercase is optional but recommended. Do not include a file extension.",  
@@ -89,7 +89,7 @@ $config = array(
 		"required" => true 
 	),
 	"cartItemTemplate" => array(
-		"name"=> "t_cart-item",
+		"name"=> "t_cart_item",
 		"type" => "text", 
 		"label" => "Name for cart item template",
 		"description" => "Please use a unique name if this collides with an existing template name. Template names may use letters (a-z A-Z), numbers (0-9), hyphens and underscores. Lowercase is optional but recommended. Do not include a file extension.",  
@@ -105,7 +105,7 @@ $config = array(
 		"required" => true 
 	),
 	"userOrdersTemplate" => array(
-		"name"=> "t_user-orders",
+		"name"=> "t_user_orders",
 		"type" => "text", 
 		"label" => "Name for user orders template",
 		"description" => "Please use a unique name if this collides with an existing template name. Template names may use letters (a-z A-Z), numbers (0-9), hyphens and underscores. Lowercase is optional but recommended. Do not include a file extension.",
