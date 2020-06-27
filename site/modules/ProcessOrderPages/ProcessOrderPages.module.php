@@ -11,11 +11,8 @@ class ProcessOrderPages extends Process {
       "singular" => true,
       'autoload' => true,
       "installs" => ["OrderCart", "PageMaker"],
-      // page that you want created to execute this module
       "page" => [
-        // your page will be online at /processwire/yourname/
         "name" => "orders",
-        // page title for this admin-page
         "title" => "Orders",
       ],
     ];
@@ -54,7 +51,7 @@ class ProcessOrderPages extends Process {
 
     if( ! $configured) {
      
-      // Just installed module
+      // Installing - fine to update config
       $data["configured"] = true; // Set flag
       $order_root_id = $data["order_root_location"];
       $order_root = $this->pages->get($order_root_id);
@@ -154,9 +151,9 @@ class ProcessOrderPages extends Process {
     $order_system_pages = $page_maker_config["setup"]["pages"];
 
     // Check for live orders before uninstalling
-    if($this->inUse($order_system_pages)) { // There are active orders
+    if($this->inUse($order_system_pages)) { 
       
-      // PageMaker files still on system - abort uninstall
+      // There are active orders - abort uninstall
       $this->error("The module could not be uninstalled as live data exists. If you want to proceed, you can remove all order data from the Admin/Orders page and try again.");
       $event->replace = true; // prevent uninstall
       $this->session->redirect("./edit?name=$class"); 
@@ -174,8 +171,8 @@ class ProcessOrderPages extends Process {
       }
 
       /*
-      Remove the fields and templates of the five order system pages - the parent "Order Pages" 
-      and "Cart Items", "Pending Orders", "Active Orders", "Completed Orders".
+      Remove the fields and templates of the five order system pages - the parent, "Order Pages", 
+      and "Cart Items", "Pending Orders", "Active Orders" and "Completed Orders".
       Args are $recursive (remove children), $report_pg_errs false as pages as will already have been removed
       */
       $page_maker->removeOrderElements(true, false);
@@ -202,7 +199,7 @@ class ProcessOrderPages extends Process {
         return false; 
       }
       $curr_p->numChildren();
-      // Exclude Order Pages as it's the parent page of the system and wil always have children
+      // Exclude Order Pages as it's the parent page of the system and will always have children
       if($pg !== "order-pages" && $curr_p->numChildren()) {
 
         return true;
@@ -240,8 +237,7 @@ class ProcessOrderPages extends Process {
   public function customInputfieldFormRender($event) {
 
     if($this->page->path === '/processwire/orders/'){
-      
-      // Add class suffix for css to remove top margin and set button colour according to status
+
       $return = $event->return;
 
       if (strpos($return, "active-form") !== false) {
@@ -250,6 +246,7 @@ class ProcessOrderPages extends Process {
         $class_suffix = "--processed";
       }
       
+      // Add class suffix for css to remove top margin and set button colour according to status
       $event->return = str_replace(
         array("uk-margin-top", "ui-button ui-widget ui-state-default ui-corner-all"), 
         array("", "ui-button ui-button$class_suffix ui-widget ui-state-default ui-corner-all"), $return);
@@ -264,6 +261,7 @@ class ProcessOrderPages extends Process {
 
     if($this->input->post->submit) {
       
+      // Update order status
       $form = $this->modules->get("InputfieldForm");
       $form->processInput($this->input->post);
 
@@ -291,15 +289,15 @@ class ProcessOrderPages extends Process {
     return $this->getTable($table_settings);
   }
   public function ___executeConfirm() {
+
+    // Double check it's OK to delete order data
     return "<h4>Are you absolutely sure you want to delete your order data?</h4>
       <a href='./' class='ui-button ui-button--pop ui-button--cancel ui-state-default'>Cancel</a>
       <a href='./deleteorders' class='ui-button ui-state-default'>Yes, get on with it!</a>";
   }
   public function ___executeDeleteOrders() {
 
-    // $order_root_id = $this["order_root_location"];
-    // $order_root = $this->pages->get($order_root_id)->child("name=order-pages");
-
+    // Delete order data
     $order_root = $this->pages->get($this["order_root"]);
 
     if($order_root->id) {
@@ -316,7 +314,7 @@ class ProcessOrderPages extends Process {
     }
   }
 /**
- * Iterate through order pages, adding children to table rows 
+ * Make a table showing orders for the provided steps
  *
  * @param Array $steps Array of step names - "pending", "active" or "completed"
  * @return Table markup
@@ -334,6 +332,7 @@ class ProcessOrderPages extends Process {
     foreach ($steps as $key) {
       $orders[$key] = $cart->getOrdersPage($key)->children();
     }
+
     $live_orders = ! array_key_exists("completed", $orders);
     $header_row_settings = ["Order Number", "Product", "Packs", "Total", "Customer"];
 
@@ -420,7 +419,7 @@ class ProcessOrderPages extends Process {
       $customer_name_set = $order_customer[$this["f_display_name"]];
       $customer_display_name = $customer_name_set ? $customer_name_set : $order_customer->name;
       
-      // Make table row
+      // Table row
       $table_rows[] = array(
         $order_number, 
         "<ul class='order-details'>{$product_detail_lis}</ul>", 
