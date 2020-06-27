@@ -175,7 +175,7 @@ class ProcessOrderPages extends Process {
       and "Cart Items", "Pending Orders", "Active Orders" and "Completed Orders".
       Args are $recursive (remove children), $report_pg_errs false as pages as will already have been removed
       */
-      $page_maker->removeOrderElements(true, false);
+      $page_maker->removeAll(true, false);
 
       parent::uninstall();
     } 
