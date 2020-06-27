@@ -163,9 +163,7 @@ class ProcessOrderPages extends Process {
 
     } else {
 
-      // Safe to proceed
-      
-      // Remove display_name field from user template
+      // Safe to proceed - remove display_name field from user template
       $f_name = $this["f_display_name"];
       $rm_fld = wire("fields")->get($f_name);
       if($rm_fld !== null) {
@@ -175,7 +173,12 @@ class ProcessOrderPages extends Process {
         wire("fields")->delete($rm_fld);
       }
 
-      $page_maker->removePages(true, false);
+      /*
+      Remove the fields and templates of the five order system pages - the parent "Order Pages" 
+      and "Cart Items", "Pending Orders", "Active Orders", "Completed Orders".
+      Args are $recursive (remove children), $report_pg_errs false as pages as will already have been removed
+      */
+      $page_maker->removeOrderElements(true, false);
 
       parent::uninstall();
     } 
@@ -257,8 +260,6 @@ class ProcessOrderPages extends Process {
   // Orders page
   public function ___execute() {
 
-    //TODO: Add page for completed orders
-
     $cart = $this->modules->get("OrderCart");
 
     if($this->input->post->submit) {
@@ -280,70 +281,19 @@ class ProcessOrderPages extends Process {
         }
       }
     }
-
-    // Operations are "Processed" and "Completed"!!!
-    $pending_orders = $cart->getOrdersPage("pending")->children();
-    $active_orders = $cart->getOrdersPage("active")->children();
-    $num_orders = 0;
-
-    $table_rows = array();
-
-    $table = $this->modules->get("MarkupAdminDataTable");
-    $table->setEncodeEntities(false);
-    $table->headerRow(["Order Number", "Product", "Packs", "Total", "Customer", "Status"]);
-
-    foreach ($pending_orders as $user_orders) {
-      foreach ($this->getTableRows($user_orders, "pending", $cart) as $row_out) {
-        $num_orders++;
-        $table->row($row_out);
-      }
-    }
-    foreach ($active_orders as $user_orders) {
-      foreach ($this->getTableRows($user_orders, "active", $cart) as $row_out) {
-        $num_orders++;
-        $table->row($row_out);
-      }
-    }
-    $out = $table->render();
-    
-    if($num_orders === 0) {
-      $out .= "<p>There are no orders currently in the system</p>";
-    } else {
-      $out .= "<small class='buttons completed-bttn'><a href='./completed' class='ui-button ui-button--pop ui-state-default '>Completed Orders</a></small><small class='buttons remove-bttn'><a href='./confirm' class='ui-button ui-button--pop ui-button--remove ui-state-default '>Remove all order data</a></small>";
-    }
-    return $out;
+   
+    $table_settings = array("pending", "active");
+    return $this->getTable($table_settings);
   }
   public function ___executeCompleted() {
 
-    $cart = $this->modules->get("OrderCart");
-    $completed_orders = $cart->getOrdersPage("completed")->children();
-    $num_orders = 0;
-
-    $table_rows = array();
-
-    $table = $this->modules->get("MarkupAdminDataTable");
-    $table->setEncodeEntities(false);
-    $table->headerRow(["Order Number", "Product", "Packs", "Total", "Customer"]);
-
-    foreach ($completed_orders as $user_orders) {
-      bd("completed_orders");
-      foreach ($this->getTableRows($user_orders, false, $cart) as $row_out) {
-        bd($row_out);
-        $num_orders++;
-        $table->row($row_out);
-      }
-    }
-    $out = $table->render();
-
-
-    $out .= "<small class='buttons completed-bttn'><a href='./' class='ui-button ui-button--pop ui-state-default '>Live Orders</a></small><small class='buttons remove-bttn'><a href='./confirm' class='ui-button ui-button--pop ui-button--remove ui-state-default '>Remove all order data</a></small>";
-
-    return $out;
+    $table_settings = array("completed");
+    return $this->getTable($table_settings);
   }
   public function ___executeConfirm() {
-  return "<h4>Are you absolutely sure you want to delete your order data?</h4>
-    <a href='./' class='ui-button ui-button--pop ui-button--cancel ui-state-default'>Cancel</a>
-    <a href='./deleteorders' class='ui-button ui-state-default'>Yes, get on with it!</a>";
+    return "<h4>Are you absolutely sure you want to delete your order data?</h4>
+      <a href='./' class='ui-button ui-button--pop ui-button--cancel ui-state-default'>Cancel</a>
+      <a href='./deleteorders' class='ui-button ui-state-default'>Yes, get on with it!</a>";
   }
   public function ___executeDeleteOrders() {
 
@@ -365,6 +315,52 @@ class ProcessOrderPages extends Process {
 
     }
   }
+/**
+ * Iterate through order pages, adding children to table rows 
+ *
+ * @param Array $steps Array of step names - "pending", "active" or "completed"
+ * @return Table markup
+ */ 
+  protected function getTable($steps) {
+
+    $cart = $this->modules->get("OrderCart");
+    $num_orders = 0;
+
+    $table = $this->modules->get("MarkupAdminDataTable");
+    $table->setEncodeEntities(false); // Parse form HTML
+    $table_rows = array();
+
+    $orders = array();
+    foreach ($steps as $key) {
+      $orders[$key] = $cart->getOrdersPage($key)->children();
+    }
+    $live_orders = ! array_key_exists("completed", $orders);
+    $header_row_settings = ["Order Number", "Product", "Packs", "Total", "Customer"];
+
+    if($live_orders){
+      $header_row_settings[] = "Status";
+    }
+
+    $table->headerRow($header_row_settings);
+
+    foreach ($orders as $step => $page_array) {
+      foreach ($page_array as $user_orders) {
+        foreach ($this->getTableRows($user_orders, $step) as $row_out) {
+          $num_orders++;
+          $table->row($row_out);
+        }
+      }
+    }
+    $out = $table->render();
+
+    if($num_orders === 0) {
+      $out .= "<p>There are no orders currently in the system</p>";
+    } else {
+      $bttn_settings = $live_orders ? array("path" => "./completed", "text" => "Completed Orders") : array("path" => "./", "text" => "Live Orders"); 
+      $out .= "<small class='buttons completed-bttn'><a href='" . $bttn_settings["path"] . "' class='ui-button ui-button--pop ui-state-default '>" . $bttn_settings["text"] . "</a></small><small class='buttons remove-bttn'><a href='./confirm' class='ui-button ui-button--pop ui-button--remove ui-state-default '>Remove all order data</a></small>";
+    }
+    return $out;
+  }
  /**
  * Iterate through order pages, adding children to table rows 
  *
@@ -372,8 +368,9 @@ class ProcessOrderPages extends Process {
  * @param string $step The order status
  * @return array of table rows
  */ 
-  protected function getTableRows($user_orders, $step, $cart) {
+  protected function getTableRows($user_orders, $step) {
 
+    $cart = $this->modules->get("OrderCart");
     $table_rows = array();
 
     foreach ($user_orders as $order) {
@@ -382,8 +379,8 @@ class ProcessOrderPages extends Process {
       $form->action = "./";
       $form->method = "post";
 
-      // $step - if false, no form required. Else button value is either "processed-form" or "completed-form"
-      if($step) {
+      // Form/button only on live orders
+      if($step !== 'completed') {
 
         $form->attr("id+name","{$step}-form");
 
@@ -395,8 +392,10 @@ class ProcessOrderPages extends Process {
         $button = $this->modules->get("InputfieldSubmit");
         $button->value = $step === "pending" ? "Processed" : "Completed";
         $form->add($button);
+      
       }
 
+      // Product details
       $product_detail_lis = "";
       $quantity_lis = "";
       $total = 0;
@@ -411,13 +410,17 @@ class ProcessOrderPages extends Process {
         $product_detail_lis .=  "<li><span class='order-details__sku'>{$sku_uc}</span> {$product_title}</li>";
         $quantity_lis .= "<li class='order-details__qty'>{$product_quantity}</li>";
         $total += $product_price * $product_quantity;
+
       }
+
+      // Order details
       $order_total = $cart->renderPrice( $total);
       $user_id = $line_item[$this["f_customer"]];
       $order_customer = $this->users->get($user_id);
       $customer_name_set = $order_customer[$this["f_display_name"]];
       $customer_display_name = $customer_name_set ? $customer_name_set : $order_customer->name;
       
+      // Make table row
       $table_rows[] = array(
         $order_number, 
         "<ul class='order-details'>{$product_detail_lis}</ul>", 
