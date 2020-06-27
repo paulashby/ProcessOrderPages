@@ -33,6 +33,28 @@ class ProcessOrderPages extends Process {
 
   }
 /**
+ * Get names of immutable config entries 
+ * - those that can't be changed after installation
+ *
+ * @return Array [$string Name of immutable entry]
+ */
+  protected function getImmutable() {
+
+      return array(
+        "order_root_location",
+        "f_display_name",
+        "f_customer",
+        "f_sku_ref",
+        "f_quantity",
+        "t_section",
+        "t_line_item",
+        "t_cart_item",
+        "t_order",
+        "t_user_orders",
+        "t_step"
+      );
+  }
+/**
  * Store info for created elements and pass to completeInstall function
  *
  * @param  HookEvent $event
@@ -121,18 +143,21 @@ class ProcessOrderPages extends Process {
         }
       }
       $event->arguments(1, $data);
-    } else{
 
-      // false or the current config returned
-      $revertConfig = $this->configDiffers($data);
+    } else {
 
-      if($revertConfig !== false) {
-            
-        // We don't want to change anything once installed, so show warning and submit existing data if anything has been changed
-        $this->session->error("Names cannot be changed after installation. If you really need to rename, you can reinstall the module, but be aware that this will mean losing the order data currently in the system");
+      $curr_config = $this->modules->getConfig($this->className);
 
-        // Revert to previous values
-        $event->arguments(1, $revertConfig);
+      if ($this->approveConfig($curr_config, $data)) {
+        // Accept changes
+        $event->arguments(1, $data);
+
+      } else {
+
+        // Reject changes. Show error for attempted changes to immutable items. Resubmit existing data.
+        $this->session->error("Only 'Order admin email', 'Next order' and 'Name of sku field' can be changed after installation. If you really need to rename fields and templates, you can reinstall the module, but be aware that this will mean losing the order data currently in the system");
+
+        $event->arguments(1, $curr_config);
       }
     }    
   }
@@ -208,26 +233,24 @@ class ProcessOrderPages extends Process {
     return false;
   }
 /**
- * Check for config naming collisions between common config elements
+ * Check for changes to immutable array items
  *
  * @param Array $new_config New config array to check
  * @return Boolean false or the current config
  */
-  protected function configDiffers($new_config) {
+  protected function approveConfig ($curr_config, $new_config) {
 
-    // Get the whole config as we've added more settings than just the user-submitted names
-    $curr_config = $this->modules->getConfig($this->className);
+   $immutable = $this->getImmutable();
 
     foreach ($new_config as $key => $val) {
 
-      if(array_key_exists($key, $curr_config)){
-
-          if($new_config[$key] !== $curr_config[$key]){
-            return $curr_config;
-          }
-        }
+      if( array_key_exists($key, $curr_config) &&
+          $new_config[$key] !== $curr_config[$key] &&
+          in_array($key, $immutable)){
+        return false;
+      }
     }
-    return false;
+    return true;
   } 
 /**
  * Adjust appearance of form field
@@ -291,7 +314,7 @@ class ProcessOrderPages extends Process {
   public function ___executeConfirm() {
 
     // Double check it's OK to delete order data
-    return "<h4>Are you absolutely sure you want to delete your order data?</h4>
+    return "<h4>WARNING: This will remove the entire order system. Are you sure you want to delete your order data?</h4>
       <a href='./' class='ui-button ui-button--pop ui-button--cancel ui-state-default'>Cancel</a>
       <a href='./deleteorders' class='ui-button ui-state-default'>Yes, get on with it!</a>";
   }
@@ -304,7 +327,7 @@ class ProcessOrderPages extends Process {
 
       $order_root->delete(true);
       return "<h3>Orders successfully removed</h3>
-      <p>You can now uninstall the " . $this->className . "module</p>";
+      <p>You can now uninstall the " . $this->className . " module</p>";
 
     } else {
 
@@ -312,6 +335,23 @@ class ProcessOrderPages extends Process {
       <p>The orders page could not be found</p>";
 
     }
+  }
+/**
+ * Check for completed orders
+ *
+* @return Boolean
+*/ 
+  protected function completedExist() {
+
+    $cart = $this->modules->get("OrderCart");
+
+    foreach ($cart->getOrdersPage("completed")->children() as $user_orders) {
+
+      if(count($user_orders)) {
+        return true;
+      }
+    }
+    return false;
   }
 /**
  * Make a table showing orders for the provided steps
@@ -333,10 +373,10 @@ class ProcessOrderPages extends Process {
       $orders[$key] = $cart->getOrdersPage($key)->children();
     }
 
-    $live_orders = ! array_key_exists("completed", $orders);
+    $live_orders_pg = ! array_key_exists("completed", $orders);
     $header_row_settings = ["Order Number", "Product", "Packs", "Total", "Customer"];
 
-    if($live_orders){
+    if($live_orders_pg){
       $header_row_settings[] = "Status";
     }
 
@@ -351,12 +391,28 @@ class ProcessOrderPages extends Process {
       }
     }
     $out = $table->render();
+    $section_link = 1;
 
-    if($num_orders === 0) {
-      $out .= "<p>There are no orders currently in the system</p>";
+    if($live_orders_pg) {
+
+      // Include link only if there are completed orders
+      if($this->completedExist()){
+        $out .= "<small class='buttons completed-bttn'><a href='./completed' class='ui-button ui-button--pop ui-state-default '>Completed Orders</a></small>";
+        $num_orders++; // Need to include Remove all button if there are only completed orders
+      }
+
     } else {
-      $bttn_settings = $live_orders ? array("path" => "./completed", "text" => "Completed Orders") : array("path" => "./", "text" => "Live Orders"); 
-      $out .= "<small class='buttons completed-bttn'><a href='" . $bttn_settings["path"] . "' class='ui-button ui-button--pop ui-state-default '>" . $bttn_settings["text"] . "</a></small><small class='buttons remove-bttn'><a href='./confirm' class='ui-button ui-button--pop ui-button--remove ui-state-default '>Remove all order data</a></small>";
+
+      // We're on Completed Orders page - always include link to live orders page
+      $out .= "<small class='buttons completed-bttn'><a href='./' class='ui-button ui-button--pop ui-state-default '>Live Orders</a></small>";     
+    }
+    if($num_orders) {
+
+      $out .= "<small class='buttons remove-bttn'><a href='./confirm' class='ui-button ui-button--pop ui-button--remove ui-state-default '>Remove all order data</a></small>";
+
+    } else {
+
+      $out .= "<p>There are no live orders currently in the system</p>";
     }
     return $out;
   }
