@@ -22,7 +22,6 @@ $out = "<!DOCTYPE html>
 	<meta charset='UTF-8'>
 	<title>" . $page->title . "</title>
 	<script src='https://ajax.googleapis.com/ajax/libs/jquery/3.5.1/jquery.min.js'></script>
-	<script src='" . $config->urls->templates . "scripts/cart.js'></script>
 </head>
 <body>
 <p><a href='" . $pages->get('/cards/')->url() . "'>Continue shopping</a></p>";
