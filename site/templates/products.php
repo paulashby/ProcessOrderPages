@@ -13,6 +13,29 @@ if($input->post->submit) {
     }	
 }
 
+if($config->ajax) {
+
+	$_input = file_get_contents("php://input");
+
+	if($_input) {
+
+		$req = json_decode($_input);
+		$params = $req->params;
+
+		if($req->action === "qtychange") {
+
+			// return $cart->changeQuantity($params->sku, $params->qty);
+			$cart->addToCart($input->post);
+		}
+
+	} else {
+		return json_encode(array("success"=>false));
+	}
+
+} else {
+
+}
+
 $out = 
 "<!DOCTYPE html>
 <html lang='en'>
