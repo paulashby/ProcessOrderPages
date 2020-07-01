@@ -206,6 +206,24 @@ class ProcessOrderPages extends Process {
     } 
   }
 /**
+ * Get price from product page that may set price via a page reference field
+ * to allow centrally managed tiered pricing
+ *
+ * @param Page $product 
+ * @return Integer price
+ */ 
+  public function getPrice($product) {
+
+    $tiered_pricing = $this["f_price"];
+
+    if(empty($tiered_pricing)) {
+      // Just using direct reference to price field on product page
+      return $product->price;
+    }
+    // Using a page reference field to allow centrally managed tiered pricing
+    return $product[$tiered_pricing]->price;
+  }
+/**
  * Check it's safe to delete provided pages
  *
  * @param array $ps Names of pages to check
@@ -460,7 +478,7 @@ class ProcessOrderPages extends Process {
         $sku_uc = strtoupper($product_sku);
         $product_page = $this->pages->findOne("sku={$product_sku}");
         $product_title = $product_page->title;
-        $product_price = $product_page->price;
+        $product_price = $this->getPrice($product_page);
         $product_quantity = $line_item[$this["f_quantity"]];
         $product_detail_lis .=  "<li><span class='order-details__sku'>{$sku_uc}</span> {$product_title}</li>";
         $quantity_lis .= "<li class='order-details__qty'>{$product_quantity}</li>";
