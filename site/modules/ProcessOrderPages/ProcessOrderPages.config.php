@@ -40,6 +40,14 @@ $config = array(
 		"value" => "", 
 		"required" => true 
 	),
+	"priceField" => array(
+		"name"=> "f_price",
+		"type" => "text", 
+		"label" => "Name of price page reference field",
+		"description" => "Useful if you're using tiered pricing. Just leave this blank if you're using a simple price field on your product page", 
+		"value" => "", 
+		"required" => false 
+	),
 	"userField" => array(
 		"name"=> "f_display_name",
 		"type" => "text", 
