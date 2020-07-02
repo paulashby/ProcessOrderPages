@@ -4,31 +4,35 @@ $cart = $this->modules->get("OrderCart");
 
 if($config->ajax) {
 
-	$_input = file_get_contents("php://input");
+	if ($session->CSRF->hasValidToken('oc_token')) {
 
-	if($_input && $user->isLoggedin()) {
+		$_input = file_get_contents("php://input");
 
-		$req = json_decode($_input);
+		if($_input && $user->isLoggedin()) {
 
-		if(property_exists($req, "params")) {
-			$params = $req->params;
+			$req = json_decode($_input);
+
+			if(property_exists($req, "params")) {
+				$params = $req->params;
+			}
+
+			if($req->action === "update") {
+				return $cart->changeQuantity($params->sku, $params->qty);
+			}
+
+			if($req->action === "remove") {
+				return $cart->removeCartItem($params->sku);
+			}
+
+			if($req->action === "order") {
+				return $cart->placeOrder();
+			}
+
+		} else {
+			return json_encode(array("success"=>false, "error"=>"Users must be logged in to use the cart"));
 		}
-
-		if($req->action === "update") {
-			return $cart->changeQuantity($params->sku, $params->qty);
-		}
-
-		if($req->action === "remove") {
-			return $cart->removeCartItem($params->sku);
-		}
-
-		if($req->action === "order") {
-			return $cart->placeOrder();
-		}
-
-	} else {
-		return json_encode(array("success"=>false));
 	}
+	return json_encode(array("success"=>false, "error"=>"CSRF validation error"));
 
 } else {
 	
