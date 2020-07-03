@@ -1,34 +1,8 @@
 <?php namespace ProcessWire;
 
 $cart = $this->modules->get("OrderCart");
-$settings = $this->modules->get("ProcessOrderPages");
-$sku_field = $settings['f_sku'];
 
-if($config->ajax) {
-
-	if ($session->CSRF->hasValidToken('oc_token')) {
-
-		$_input = file_get_contents("php://input");
-
-		if($_input && $user->isLoggedin()) {
-
-			$req = json_decode($_input);
-
-			if(property_exists($req, "params")) {
-				$params = $req->params;
-			}
-
-			if($req->action === "add") {
-				return $cart->addToCart($params->sku, $params->qty);
-			}
-
-		} else {
-			return json_encode(array("success"=>false, "error"=>"Users must be logged in to use the cart"));
-		}
-	}
-	return json_encode(array("success"=>false, "error"=>"CSRF validation error"));
-
-} else {
+if( ! $config->ajax) {
 
 	$out = "<!DOCTYPE html>
 	<html lang='en'>

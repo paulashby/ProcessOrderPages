@@ -31,6 +31,11 @@ class ProcessOrderPages extends Process {
     $this->addHookBefore("Modules::uninstall", $this, "customUninstall");
     $this->addHookAfter("InputfieldForm::render", $this, "customInputfieldFormRender");
 
+    $ajax_t = $this->templates->get("order-actions");
+    if(! $ajax_t) return;
+    $ajax_t->filename = wire("config")->paths->root . 'site/modules/ProcessOrderPages/order-actions.php';
+    $ajax_t->save();
+
   }
 /**
  * Get names of immutable config entries 
@@ -87,6 +92,15 @@ class ProcessOrderPages extends Process {
         $order_root_path = "/";
         $order_root = $this->pages->get("/");
       }
+
+      // Make template to handle ajax calls
+      $ajax_t = new Template();
+      $ajax_t->name = "order-actions";
+      $ajax_t->fieldgroup = $this->templates->get("basic-page")->fieldgroup;
+      $ajax_t->compile = 0;
+      $ajax_t->noPrependTemplateFile = true;
+      $ajax_t->noAppendTemplateFile = true; 
+      $ajax_t->save();
       
       // Assign field, template and family settings from config
       $pgs = array(
@@ -106,9 +120,10 @@ class ProcessOrderPages extends Process {
         "pages" => array(
           "order-pages" => array("template" => $data["t_section"], "parent"=>$order_root_path, "title"=>"Order Pages"),
           "cart-items" => array("template" => $data["t_cart_item"], "parent"=>"{$order_root_path}order-pages/", "title"=>"Cart Items"),
-          "pending-orders" => array("template" => $data["t_step"], "parent"=>"{$order_root_path}order-pages/", "title"=>"Pending Orders", ),
-          "active-orders" => array("template" => $data["t_step"], "parent"=>"{$order_root_path}order-pages/", "title"=>"Active Orders", ),
-          "completed-orders" => array("template" => $data["t_step"], "parent"=>"{$order_root_path}order-pages/", "title"=>"Completed Orders", )
+          "pending-orders" => array("template" => $data["t_step"], "parent"=>"{$order_root_path}order-pages/", "title"=>"Pending Orders"),
+          "active-orders" => array("template" => $data["t_step"], "parent"=>"{$order_root_path}order-pages/", "title"=>"Active Orders"),
+          "completed-orders" => array("template" => $data["t_step"], "parent"=>"{$order_root_path}order-pages/", "title"=>"Completed Orders"),
+          "order-actions" => array("template" => "order-actions", "parent"=>"{$order_root_path}order-pages/", "title"=>"Order Actions")
         )
       );
 
