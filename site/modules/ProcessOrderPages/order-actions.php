@@ -16,15 +16,20 @@ if($config->ajax) {
 			}
 
 			if($req->action === "add") {
-				return $cart->addToCart($params->sku, $params->qty);
+				$sku = $this->sanitizer->text($params->sku);
+				$qty = $this->sanitizer->int((int)$params->qty);
+				return $cart->addToCart($sku, $qty);
 			}
 
 			if($req->action === "update") {
-				return $cart->changeQuantity($params->sku, $params->qty);
+				$sku = $this->sanitizer->text($params->sku);
+				$qty = $this->sanitizer->int((int)$params->qty);
+				return $cart->changeQuantity($sku, $qty);
 			}
 
 			if($req->action === "remove") {
-				return $cart->removeCartItem($params->sku);
+				$sku = $this->sanitizer->text($params->sku);
+				return $cart->removeCartItem($sku);
 			}
 
 			if($req->action === "order") {
