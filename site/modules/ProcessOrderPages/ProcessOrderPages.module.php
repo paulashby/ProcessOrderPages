@@ -102,15 +102,16 @@ class ProcessOrderPages extends Process {
       $ajax_t->noAppendTemplateFile = true; 
       $ajax_t->save();
       
-      // Assign field, template and family settings from config
+      // Create array of required pages containing three associative arrays whose member keys are taken from module config. These hold field, template and family settings from config
       $pgs = array(
         "fields" => array(
           $data["f_customer"] => array("fieldtype"=>"FieldtypeText", "label"=>"Customer"),
           $data["f_sku_ref"] => array("fieldtype"=>"FieldtypeText", "label"=>"Record of cart item sku"),
-          $data["f_quantity"] => array("fieldtype"=>"FieldtypeInteger", "label"=>"Number of packs")
+          $data["f_quantity"] => array("fieldtype"=>"FieldtypeInteger", "label"=>"Number of packs"),
+          $data["f_ordered_price"] => array("fieldtype"=>"FieldtypeInteger", "label"=>"Price when ordered")
         ),
         "templates" => array(
-          $data["t_line_item"] => array("t_parents" => array($data["t_cart_item"], $data["t_order"]), "t_fields"=>array($data["f_customer"], $data["f_sku_ref"], $data["f_quantity"])),
+          $data["t_line_item"] => array("t_parents" => array($data["t_cart_item"], $data["t_order"]), "t_fields"=>array($data["f_customer"], $data["f_sku_ref"], $data["f_quantity"], $data["f_ordered_price"])),
           $data["t_cart_item"] => array("t_parents" => array($data["t_section"]), "t_children" => array($data["t_line_item"])),
           $data["t_order"] => array("t_parents" => array($data["t_user_orders"]), "t_children" => array($data["t_line_item"])),
           $data["t_user_orders"] => array("t_parents" => array($data["t_step"]), "t_children" => array($data["t_order"])),
@@ -493,7 +494,7 @@ class ProcessOrderPages extends Process {
         $sku_uc = strtoupper($product_sku);
         $product_page = $this->pages->findOne("sku={$product_sku}");
         $product_title = $product_page->title;
-        $product_price = $this->getPrice($product_page);
+        $product_price = $line_item[$this["f_ordered_price"]];
         $product_quantity = $line_item[$this["f_quantity"]];
         $product_detail_lis .=  "<li><span class='order-details__sku'>{$sku_uc}</span> {$product_title}</li>";
         $quantity_lis .= "<li class='order-details__qty'>{$product_quantity}</li>";
