@@ -44,7 +44,7 @@ $config = array(
 		"name"=> "f_sku",
 		"type" => "text", 
 		"label" => "Name of sku field",
-		"description" => "Please enter the name of your product number field - ideally this should be FieldtypeTextUnique", 
+		"description" => "Please enter the name of your existing product number field - ideally this should be FieldtypeTextUnique", 
 		"value" => "", 
 		"required" => true 
 	),
@@ -52,9 +52,9 @@ $config = array(
 		"name"=> "f_ordered_price",
 		"type" => "text", 
 		"label" => "Name of price-when-ordered field",
-		"description" => "The price of a line item is stored in this field at time of order, so order prices will be unaffected by subsequent price changes", 
-		"value" => "", 
-		"required" => false 
+		"description" => "Please use a unique name if this collides with an existing field name. Use only ASCII letters (a-z A-Z), numbers (0-9) or underscores. The price of a line item is stored in this field at time of order, so order prices will be unaffected by subsequent price changes.", 
+		"value" => "purchase_price", 
+		"required" => true 
 	),
 	"userField" => array(
 		"name"=> "f_display_name",
@@ -135,5 +135,13 @@ $config = array(
 		"description" => "Please use a unique name if this collides with an existing template name. Template names may use letters (a-z A-Z), numbers (0-9), hyphens and underscores. Lowercase is optional but recommended. Do not include a file extension.",  
 		"value" => "step", 
 		"required" => true 
+	),
+	"orderPageAccess" => array(
+		"name"=> "t_access",
+		"type" => "text", 
+		"label" => "Roles with view access to order pages (can't be reset after installation)",
+		"description" => "Please provide a comma-separated list of role names or IDs.",  
+		"value" => "", 
+		"required" => false 
 	)
 );
