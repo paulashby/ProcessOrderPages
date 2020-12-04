@@ -101,7 +101,7 @@ class ProcessOrderPages extends Process {
       $ajax_t->noPrependTemplateFile = true;
       $ajax_t->noAppendTemplateFile = true; 
       $ajax_t->save();
-      
+
       // Create array of required pages containing three associative arrays whose member keys are taken from module config. These hold field, template and family settings from config
       $pgs = array(
         "fields" => array(
@@ -127,6 +127,14 @@ class ProcessOrderPages extends Process {
           "order-actions" => array("template" => "order-actions", "parent"=>"{$order_root_path}order-pages/", "title"=>"Order Actions")
         )
       );
+
+      $t_acess = $data["t_access"];
+      if(gettype($t_acess) === "string" && strlen($t_acess)) {
+        $access_roles_array = explode(",", $t_acess);
+        $t_access = array("view"=>$access_roles_array);
+        $t_name = $data["t_section"];
+        $pgs["templates"][$t_name]["t_access"] = $t_access;
+      }
 
       $made_pages = $page_maker->makePages($pgs);
       if($made_pages !== true){
@@ -217,6 +225,12 @@ class ProcessOrderPages extends Process {
       Args are $recursive (remove children), $report_pg_errs false as pages as will already have been removed
       */
       $page_maker->removeAll(true, false);
+
+      // Remove the ajax template that was installed by init()
+      $ajax_t = $this->templates->get("order-actions");
+      if($ajax_t) {
+        wire('templates')->delete($ajax_t);
+      }
 
       parent::uninstall();
     } 
