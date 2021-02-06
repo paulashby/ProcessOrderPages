@@ -48,92 +48,12 @@ $config = array(
 		"value" => "", 
 		"required" => true 
 	),
-	"orderedPriceField" => array(
-		"name"=> "f_ordered_price",
+	"popPrefix" => array(
+		"name"=> "prfx",
 		"type" => "text", 
-		"label" => "Name of price-when-ordered field",
-		"description" => "Please use a unique name if this collides with an existing field name. Use only ASCII letters (a-z A-Z), numbers (0-9) or underscores. The price of a line item is stored in this field at time of order, so order prices will be unaffected by subsequent price changes.", 
-		"value" => "purchase_price", 
-		"required" => true 
-	),
-	"userField" => array(
-		"name"=> "f_display_name",
-		"type" => "text", 
-		"label" => "Name for user display name field on profile pages (can't be reset after installation)",
-		"description" => "Please use a unique name if this collides with an existing field name. Use only ASCII letters (a-z A-Z), numbers (0-9) or underscores.", 
-		"value" => "display_name", 
-		"required" => true 
-	),
-	"customerField" => array(
-		"name"=> "f_customer",
-		"type" => "text", 
-		"label" => "Name for customer field (can't be reset after installation)",
-		"description" => "Please use a unique name if this collides with an existing field name. Use only ASCII letters (a-z A-Z), numbers (0-9) or underscores.",  
-		"value" => "customer", 
-		"required" => true 
-	),
-	"skuRefField" => array(
-		"name"=> "f_sku_ref",
-		"type" => "text", 
-		"label" => "Name for sku reference field (can't be reset after installation)",
-		"description" => "Please use a unique name if this collides with an existing field name. Use only ASCII letters (a-z A-Z), numbers (0-9) or underscores.", 
-		"value" => "sku_ref", 
-		"required" => true 
-	),
-	"quantityField" => array(
-		"name"=> "f_quantity",
-		"type" => "text", 
-		"label" => "Name for quantity field (can't be reset after installation)",
-		"description" => "Please use a unique name if this collides with an existing field name. Use only ASCII letters (a-z A-Z), numbers (0-9) or underscores.",  
-		"value" => "quantity", 
-		"required" => true 
-	),
-	"sectionTemplate" => array(
-		"name"=> "t_section",
-		"type" => "text", 
-		"label" => "Name for section template (can't be reset after installation)",
-		"description" => "Please use a unique name if this collides with an existing template name. Template names may use letters (a-z A-Z), numbers (0-9), hyphens and underscores. Lowercase is optional but recommended. Do not include a file extension.",  
-		"value" => "section", 
-		"required" => true 
-	),
-	"lineItemTemplate" => array(
-		"name"=> "t_line_item",
-		"type" => "text", 
-		"label" => "Name for line item template (can't be reset after installation)",
-		"description" => "Please use a unique name if this collides with an existing template name. Template names may use letters (a-z A-Z), numbers (0-9), hyphens and underscores. Lowercase is optional but recommended. Do not include a file extension.",  
-		"value" => "line-item", 
-		"required" => true 
-	),
-	"cartItemTemplate" => array(
-		"name"=> "t_cart_item",
-		"type" => "text", 
-		"label" => "Name for cart item template (can't be reset after installation)",
-		"description" => "Please use a unique name if this collides with an existing template name. Template names may use letters (a-z A-Z), numbers (0-9), hyphens and underscores. Lowercase is optional but recommended. Do not include a file extension.",  
-		"value" => "cart-item", 
-		"required" => true 
-	),
-	"orderTemplate" => array(
-		"name"=> "t_order",
-		"type" => "text", 
-		"label" => "Name for order template (can't be reset after installation)",
-		"description" => "Please use a unique name if this collides with an existing template name. Template names may use letters (a-z A-Z), numbers (0-9), hyphens and underscores. Lowercase is optional but recommended. Do not include a file extension.",
-		"value" => "order", 
-		"required" => true 
-	),
-	"userOrdersTemplate" => array(
-		"name"=> "t_user_orders",
-		"type" => "text", 
-		"label" => "Name for user orders template (can't be reset after installation)",
-		"description" => "Please use a unique name if this collides with an existing template name. Template names may use letters (a-z A-Z), numbers (0-9), hyphens and underscores. Lowercase is optional but recommended. Do not include a file extension.",
-		"value" => "user-orders", 
-		"required" => true 
-	),
-	"stepTemplate" => array(
-		"name"=> "t_step",
-		"type" => "text", 
-		"label" => "Name for step template (can't be reset after installation)",
-		"description" => "Please use a unique name if this collides with an existing template name. Template names may use letters (a-z A-Z), numbers (0-9), hyphens and underscores. Lowercase is optional but recommended. Do not include a file extension.",  
-		"value" => "step", 
+		"label" => "Prefix for fields and templates",
+		"description" => "Please enter a string to prepend to generated field and template names to avoid naming collisions", 
+		"value" => "pop", 
 		"required" => true 
 	),
 	"orderPageAccess" => array(

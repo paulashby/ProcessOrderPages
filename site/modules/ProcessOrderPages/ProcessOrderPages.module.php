@@ -7,7 +7,7 @@ class ProcessOrderPages extends Process {
       "title" => "Process Order Pages",
       "summary" => "Allows order pages to be created on front end and managed via admin.",
       "author" => "Paul Ashby, primitive.co",
-      "version" => 1,
+      "version" => 1.1,
       "singular" => true,
       'autoload' => true,
       "installs" => ["OrderCart", "PageMaker"],
@@ -47,16 +47,7 @@ class ProcessOrderPages extends Process {
 
       return array(
         "order_root_location",
-        "f_display_name",
-        "f_customer",
-        "f_sku_ref",
-        "f_quantity",
-        "t_section",
-        "t_line_item",
-        "t_cart_item",
-        "t_order",
-        "t_user_orders",
-        "t_step"
+        "prfx"
       );
   }
 /**
@@ -102,41 +93,45 @@ class ProcessOrderPages extends Process {
       $ajax_t->noAppendTemplateFile = true; 
       $ajax_t->save();
 
+      $prfx = $data["prfx"];
+
       // Create array of required pages containing three associative arrays whose member keys are taken from module config. These hold field, template and family settings from config
       $pgs = array(
         "fields" => array(
-          $data["f_customer"] => array("fieldtype"=>"FieldtypeText", "label"=>"Customer"),
-          $data["f_sku_ref"] => array("fieldtype"=>"FieldtypeText", "label"=>"Record of cart item sku"),
-          $data["f_quantity"] => array("fieldtype"=>"FieldtypeInteger", "label"=>"Number of packs"),
-          $data["f_ordered_price"] => array("fieldtype"=>"FieldtypeInteger", "label"=>"Price when ordered")
+          "{$prfx}_customer" => array("fieldtype"=>"FieldtypeText", "label"=>"Customer"),
+          "{$prfx}_sku_ref" => array("fieldtype"=>"FieldtypeText", "label"=>"Record of cart item sku"),
+          "{$prfx}_quantity" => array("fieldtype"=>"FieldtypeInteger", "label"=>"Number of packs"),
+          "{$prfx}_purchase_price" => array("fieldtype"=>"FieldtypeInteger", "label"=>"Price when ordered")
         ),
         "templates" => array(
-          $data["t_line_item"] => array("t_parents" => array($data["t_cart_item"], $data["t_order"]), "t_fields"=>array($data["f_customer"], $data["f_sku_ref"], $data["f_quantity"], $data["f_ordered_price"])),
-          $data["t_cart_item"] => array("t_parents" => array($data["t_section"]), "t_children" => array($data["t_line_item"])),
-          $data["t_order"] => array("t_parents" => array($data["t_user_orders"]), "t_children" => array($data["t_line_item"])),
-          $data["t_user_orders"] => array("t_parents" => array($data["t_step"]), "t_children" => array($data["t_order"])),
-          $data["t_step"] => array("t_parents" => array($data["t_section"]), "t_children" => array($data["t_user_orders"])),
-          $data["t_section"] => array("t_children" => array($data["t_section"], $data["t_cart_item"]))
+          "{$prfx}-line-item" => array("t_parents" => array("{$prfx}-cart-item", "{$prfx}-order"), "t_fields"=>array("{$prfx}_customer", "{$prfx}_sku_ref", "{$prfx}_quantity","{$prfx}_purchase_price")),
+          "{$prfx}-cart-item" => array("t_parents" => array("{$prfx}-section"), "t_children" => array("{$prfx}-line-item")),
+          "{$prfx}-order" => array("t_parents" => array("{$prfx}-user-orders"), "t_children" => array("{$prfx}-line-item")),
+          "{$prfx}-user-orders" => array("t_parents" => array("{$prfx}-step"), "t_children" => array("{$prfx}-order")),
+          "{$prfx}-step" => array("t_parents" => array("{$prfx}-section"), "t_children" => array("{$prfx}-user-orders")),
+          "{$prfx}-section" => array("t_children" => array("{$prfx}-section", "{$prfx}-cart-item"))
         ),
         "pages" => array(
-          "order-pages" => array("template" => $data["t_section"], "parent"=>$order_root_path, "title"=>"Order Pages"),
-          "cart-items" => array("template" => $data["t_cart_item"], "parent"=>"{$order_root_path}order-pages/", "title"=>"Cart Items"),
-          "pending-orders" => array("template" => $data["t_step"], "parent"=>"{$order_root_path}order-pages/", "title"=>"Pending Orders"),
-          "active-orders" => array("template" => $data["t_step"], "parent"=>"{$order_root_path}order-pages/", "title"=>"Active Orders"),
-          "completed-orders" => array("template" => $data["t_step"], "parent"=>"{$order_root_path}order-pages/", "title"=>"Completed Orders"),
+          "order-pages" => array("template" => "{$prfx}-section", "parent"=>$order_root_path, "title"=>"Order Pages"),
+          "cart-items" => array("template" => "{$prfx}-cart-item", "parent"=>"{$order_root_path}order-pages/", "title"=>"Cart Items"),
+          "pending-orders" => array("template" => "{$prfx}-step", "parent"=>"{$order_root_path}order-pages/", "title"=>"Pending Orders"),
+          "active-orders" => array("template" => "{$prfx}-step", "parent"=>"{$order_root_path}order-pages/", "title"=>"Active Orders"),
+          "completed-orders" => array("template" => "{$prfx}-step", "parent"=>"{$order_root_path}order-pages/", "title"=>"Completed Orders"),
           "order-actions" => array("template" => "order-actions", "parent"=>"{$order_root_path}order-pages/", "title"=>"Order Actions")
         )
       );
-
-      $t_acess = $data["t_access"];
-      if(gettype($t_acess) === "string" && strlen($t_acess)) {
-        $access_roles_array = explode(",", $t_acess);
+      
+      // t_access is a comma-separated list of roles with view access to order pages
+      $t_access = $data["t_access"];
+      if(gettype($t_access) === "string" && strlen($t_access)) {
+        $access_roles_array = explode(",", $t_access);
         $t_access = array("view"=>$access_roles_array);
-        $t_name = $data["t_section"];
+        $t_name = "{$prfx}-section";
         $pgs["templates"][$t_name]["t_access"] = $t_access;
       }
 
-      $made_pages = $page_maker->makePages($pgs);
+      $made_pages = $page_maker->makePages("process_order_pages", $pgs, true, true);
+
       if($made_pages !== true){
         
         foreach ($made_pages as $e) {
@@ -150,7 +145,7 @@ class ProcessOrderPages extends Process {
         // Add display_name field to user template
         $f = new Field();
         $f->type = $this->modules->get("FieldtypeText");
-        $f_name = $data["f_display_name"];
+        $f_name = "{$prfx}_display_name";
         $f->name = $f_name;
         $f->label = "Name displayed on orders";
         $f->save();
@@ -197,7 +192,7 @@ class ProcessOrderPages extends Process {
 
     $page_maker = $this->modules->get("PageMaker");
     $page_maker_config = $this->modules->getConfig("PageMaker"); 
-    $order_system_pages = $page_maker_config["setup"]["pages"];
+    $order_system_pages = $page_maker_config["page_sets"]["process_order_pages"]["setup"]["pages"];
 
     // Check for live orders before uninstalling
     if($this->inUse($order_system_pages)) { 
@@ -224,7 +219,7 @@ class ProcessOrderPages extends Process {
       and "Cart Items", "Pending Orders", "Active Orders" and "Completed Orders".
       Args are $recursive (remove children), $report_pg_errs false as pages as will already have been removed
       */
-      $page_maker->removeAll(true, false);
+      $page_maker->removeSet("process_order_pages", false);
 
       // Remove the ajax template that was installed by init()
       $ajax_t = $this->templates->get("order-actions");
@@ -445,6 +440,7 @@ class ProcessOrderPages extends Process {
 
       // Include link only if there are completed orders
       if($this->completedExist()){
+
         $out .= "<small class='buttons completed-bttn'><a href='./completed' class='ui-button ui-button--pop ui-state-default '>Completed Orders</a></small>";
         $num_orders++; // Need to include Remove all button if there are only completed orders
       }
@@ -502,25 +498,25 @@ class ProcessOrderPages extends Process {
       $product_detail_lis = "";
       $quantity_lis = "";
       $total = 0;
+      $prfx = $this["prfx"];
 
       foreach ($order->children() as $line_item) {
-        $product_sku = $line_item[$this["f_sku_ref"]];
+        $product_sku = $line_item["{$prfx}_sku_ref"];
         $sku_uc = strtoupper($product_sku);
         $product_page = $this->pages->findOne("sku={$product_sku}");
         $product_title = $product_page->title;
-        $product_price = $line_item[$this["f_ordered_price"]];
-        $product_quantity = $line_item[$this["f_quantity"]];
+        $product_price = $line_item["{$prfx}_purchase_price"];//This is an empty string
+        $product_quantity = $line_item["{$prfx}_quantity"];
         $product_detail_lis .=  "<li><span class='order-details__sku'>{$sku_uc}</span> {$product_title}</li>";
         $quantity_lis .= "<li class='order-details__qty'>{$product_quantity}</li>";
         $total += $product_price * $product_quantity;
-
       }
 
       // Order details
       $order_total = $cart->renderPrice( $total);
-      $user_id = $line_item[$this["f_customer"]];
+      $user_id = $line_item["{$prfx}_customer"];
       $order_customer = $this->users->get($user_id);
-      $customer_name_set = $order_customer[$this["f_display_name"]];
+      $customer_name_set = $order_customer["{$prfx}_display_name"];
       $customer_display_name = $customer_name_set ? $customer_name_set : $order_customer->name;
       
       // Table row
