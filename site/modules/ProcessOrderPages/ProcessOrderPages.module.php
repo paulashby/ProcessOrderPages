@@ -252,7 +252,7 @@ class ProcessOrderPages extends Process {
  * Check it's safe to delete provided pages
  *
  * @param array $ps Names of pages to check
- * @return boolean true if pages are safe to delete
+ * @return boolean false if pages are safe to delete
  */
   protected function inUse($ps) {
 
