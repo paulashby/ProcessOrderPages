@@ -261,14 +261,10 @@ class ProcessOrderPages extends Process {
       $selector = 'name=' . $pg;
       $curr_p = $this->pages->findOne($selector);
 
-      if($curr_p->id === 0){
-
-        // Removed already - presumably via button on /admin/orders/
-        return false; 
-      }
-      $curr_p->numChildren();
+      // Removed already - presumably via button on /admin/orders/
+      $missing = $curr_p->id === 0;
       // Exclude Order Pages as it's the parent page of the system and will always have children
-      if($pg !== "order-pages" && $curr_p->numChildren()) {
+      if( ! $missing && $pg !== "order-pages" && $curr_p->numChildren()) {
 
         return true;
       }
