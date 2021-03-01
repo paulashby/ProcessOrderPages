@@ -355,7 +355,7 @@ class ProcessOrderPages extends Process {
     // Double check it's OK to delete order data
     return "<h4>WARNING: This will remove the entire order system. Are you sure you want to delete your order data?</h4>
       <a href='./' class='ui-button ui-button--pop ui-button--cancel ui-state-default'>Cancel</a>
-      <a href='./deleteorders' class='ui-button ui-state-default'>Yes, get on with it!</a>";
+      <a href='./deleteorders' class='ui-button ui-button--nuclear ui-state-default'>Yes, get on with it!</a>";
   }
   public function ___executeDeleteOrders() {
 
@@ -437,7 +437,7 @@ class ProcessOrderPages extends Process {
       // Include link only if there are completed orders
       if($this->completedExist()){
 
-        $out .= "<small class='buttons completed-bttn'><a href='./completed' class='ui-button ui-button--pop ui-state-default '>Completed Orders</a></small>";
+        $out .= "<small class='buttons completed-bttn'><a href='./completed' class='ui-button ui-button--completed ui-button--pop ui-state-default '>Completed Orders</a></small>";
         $num_orders++; // Need to include Remove all button if there are only completed orders
       }
 
