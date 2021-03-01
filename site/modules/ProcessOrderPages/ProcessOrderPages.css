@@ -1,22 +1,3 @@
-.ui-button.ui-button--remove {
-	background-color: #6d7a8a;
-}
-
-.ui-button.ui-button--processed {
-	background-color: #ca5e5e;
-}
-.ui-button.ui-button--pending {
-	background-color: #3eb998;
-}
-.ui-button--pop.ui-button--cancel {
-	background-color: #1c2836;
-}
-.ui-button.ui-button--remove:hover,
-.ui-button.ui-button--processed:hover,
-.ui-button.ui-button--pending:hover,
-.ui-button--pop.ui-button--cancel:hover {
-	background-color: #e83561;
-}
 .order-details {
 	font-style: italic;
 	list-style: none;
@@ -28,4 +9,19 @@
 }
 .order-details__qty {
 	font-style: normal;
+}
+.ui-button.ui-button--processed {
+	background-color: #ca5e5e; /* Red */
+}
+.ui-button.ui-button--pending, .ui-button.ui-button--accepted, .ui-button.ui-button--completed, .ui-button.ui-button--nuclear {
+	background-color: #3eb998; /* Green */
+}
+.ui-button.ui-button--remove {
+	background-color: #6d7a8a; /* Grey */
+}
+.ui-button.ui-button--cancel {
+	background-color: #1c2836; /* Black */
+}
+.ui-button.ui-button--processed:hover, .ui-button.ui-button--nope:hover, .ui-button.ui-button--pending:hover, .ui-button.ui-button--accepted:hover, .ui-button.ui-button--completed:hover, .ui-button.ui-button--remove:hover, .ui-button.ui-button--nuclear:hover, .ui-button.ui-button--cancel:hover  {
+	background-color: #e83561; /* Bright red */
 }
