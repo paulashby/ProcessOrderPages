@@ -47,7 +47,8 @@ class ProcessOrderPages extends Process {
 
       return array(
         "order_root_location",
-        "prfx"
+        "prfx",
+        "t_access"
       );
   }
 /**
