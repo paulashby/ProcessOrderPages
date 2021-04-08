@@ -24,6 +24,7 @@ if($config->ajax) {
 			if($req->action === "update") {
 				$sku = $this->sanitizer->text($params->sku);
 				$qty = $this->sanitizer->int((int)$params->qty);
+
 				return $cart->changeQuantity($sku, $qty);
 			}
 
