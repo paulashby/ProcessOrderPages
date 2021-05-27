@@ -99,8 +99,8 @@ class ProcessOrderPages extends Process {
       // Create array of required pages containing three associative arrays whose member keys are taken from module config. These hold field, template and family settings from config
       $pgs = array(
         "fields" => array(
-          "{$prfx}_customer" => array("fieldtype"=>"FieldtypeText", "label"=>"Customer"),
-          "{$prfx}_sku_ref" => array("fieldtype"=>"FieldtypeText", "label"=>"Record of cart item sku"),
+          "{$prfx}_customer" => array("fieldtype"=>"FieldtypeText", "label"=>"Customer", "config"=>array("html_ee")),
+          "{$prfx}_sku_ref" => array("fieldtype"=>"FieldtypeText", "label"=>"Record of cart item sku", "config"=>array("html_ee")),
           "{$prfx}_quantity" => array("fieldtype"=>"FieldtypeInteger", "label"=>"Number of packs"),
           "{$prfx}_purchase_price" => array("fieldtype"=>"FieldtypeInteger", "label"=>"Price when ordered")
         ),
@@ -149,6 +149,8 @@ class ProcessOrderPages extends Process {
         $f_name = "{$prfx}_display_name";
         $f->name = $f_name;
         $f->label = "Name displayed on orders";
+        // Set Text Formatter to HTML Entity Encoder
+        $f->set("textformatters", array("TextformatterEntities"));
         $f->save();
         $usr_template = $this->templates->get("user");
         $ufg = $usr_template->fieldgroup;
@@ -206,7 +208,8 @@ class ProcessOrderPages extends Process {
     } else {
 
       // Safe to proceed - remove display_name field from user template
-      $f_name = $this["f_display_name"];
+      $prfx = $this["prfx"];
+      $f_name = "{$prfx}_display_name";
       $rm_fld = wire("fields")->get($f_name);
       if($rm_fld !== null) {
         $ufg = wire("fieldgroups")->get("user");
