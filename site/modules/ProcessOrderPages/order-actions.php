@@ -25,7 +25,7 @@ if($config->ajax) {
 				$sku = $this->sanitizer->text($params->sku);
 				$qty = $this->sanitizer->int((int)$params->qty);
 
-				return $cart->changeQuantity($sku, $qty);
+				return $cart->changeQuantity($sku, $qty, true); // last arg = eager loading - else lazy loading images don't appear when cart updates
 			}
 
 			if($req->action === "remove") {
