@@ -359,7 +359,26 @@ class ProcessOrderPages extends Process {
     // Double check it's OK to delete order data
     return "<h4>WARNING: This will remove the entire order system. Are you sure you want to delete your order data?</h4>
       <a href='./' class='ui-button ui-button--pop ui-button--cancel ui-state-default'>Cancel</a>
-      <a href='./deleteorders' class='ui-button ui-button--nuclear ui-state-default'>Yes, get on with it!</a>";
+      <a href='./deleteorders' class='ui-button ui-button--nuclear ui-state-default'>Yes, delete this data!</a>";
+  }
+  public function ___executeConfirmDeleteCompleted() {
+
+    // Double check it's OK to delete order data
+    return "<h4>WARNING: This will remove all completed orders. Are you sure you want to delete this data?</h4>
+      <a href='./' class='ui-button ui-button--pop ui-button--cancel ui-state-default'>Cancel</a>
+      <a href='./deletecompleted' class='ui-button ui-button--nuclear ui-state-default'>Yes, delete this data!</a>";
+  }
+  public function ___executeDeleteCompleted() {
+
+    // Delete completed order data
+    $completed = $this->pages->get('completed-orders')->children();
+
+    foreach ($completed as $order) {
+      $order->delete(true);
+    }
+
+    return "<h3>Completed orders successfully removed</h3>
+      <p>Any newly completed orders will be added as usual.</p>";
   }
   public function ___executeDeleteOrders() {
 
@@ -448,7 +467,8 @@ class ProcessOrderPages extends Process {
     } else {
 
       // We're on Completed Orders page - always include link to live orders page
-      $out .= "<small class='buttons completed-bttn'><a href='./' class='ui-button ui-button--pop ui-state-default '>Live Orders</a></small>";     
+      $out .= "<small class='buttons completed-bttn'><a href='./' class='ui-button ui-button--pop ui-state-default '>Live Orders</a></small>
+      <small class='buttons remove-bttn'><a href='./confirmdeletecompleted' class='ui-button ui-button--pop ui-button--remove ui-state-default '>Remove completed orders</a></small>";     
     }
     if($num_orders) {
 
