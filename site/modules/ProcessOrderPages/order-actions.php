@@ -34,7 +34,8 @@ if($config->ajax) {
 			}
 
 			if($req->action === "order") {
-				return $cart->placeOrder();
+				$ecopack = $this->sanitizer->bool($params->ecopack);
+				return $cart->placeOrder($ecopack);
 			}
 
 		} else {

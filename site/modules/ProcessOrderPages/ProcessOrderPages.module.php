@@ -102,10 +102,11 @@ class ProcessOrderPages extends Process {
           "{$prfx}_customer" => array("fieldtype"=>"FieldtypeText", "label"=>"Customer", "config"=>array("html_ee")),
           "{$prfx}_sku_ref" => array("fieldtype"=>"FieldtypeText", "label"=>"Record of cart item sku", "config"=>array("html_ee")),
           "{$prfx}_quantity" => array("fieldtype"=>"FieldtypeInteger", "label"=>"Number of packs"),
-          "{$prfx}_purchase_price" => array("fieldtype"=>"FieldtypeInteger", "label"=>"Price when ordered")
+          "{$prfx}_purchase_price" => array("fieldtype"=>"FieldtypeInteger", "label"=>"Price when ordered"),
+          "{$prfx}_ecopack" => array("fieldtype"=>"FieldtypeInteger", "label"=>"Supply in eco pack")
         ),
         "templates" => array(
-          "{$prfx}-line-item" => array("t_parents" => array("{$prfx}-cart-item", "{$prfx}-order"), "t_fields"=>array("{$prfx}_customer", "{$prfx}_sku_ref", "{$prfx}_quantity","{$prfx}_purchase_price")),
+          "{$prfx}-line-item" => array("t_parents" => array("{$prfx}-cart-item", "{$prfx}-order"), "t_fields"=>array("{$prfx}_customer", "{$prfx}_sku_ref", "{$prfx}_quantity","{$prfx}_purchase_price", "{$prfx}_ecopack")),
           "{$prfx}-cart-item" => array("t_parents" => array("{$prfx}-section"), "t_children" => array("{$prfx}-line-item")),
           "{$prfx}-order" => array("t_parents" => array("{$prfx}-user-orders"), "t_children" => array("{$prfx}-line-item")),
           "{$prfx}-user-orders" => array("t_parents" => array("{$prfx}-step"), "t_children" => array("{$prfx}-order")),
@@ -493,7 +494,7 @@ class ProcessOrderPages extends Process {
     $table_rows = array();
 
     foreach ($user_orders as $order) {
-      $order_number = $order->name;
+      $order_number = strtoupper($order->name);
       $form = $this->modules->get("InputfieldForm");
       $form->action = "./";
       $form->method = "post";
@@ -521,14 +522,18 @@ class ProcessOrderPages extends Process {
       $prfx = $this["prfx"];
 
       foreach ($order->children() as $line_item) {
+
+        $ecopack = $line_item["{$prfx}_ecopack"] == 1;
+        $pack_str = $ecopack ? "(eco pack)" : "(cello bag)";
+        
         $product_sku = $line_item["{$prfx}_sku_ref"];
         $sku_uc = strtoupper($product_sku);
         $product_page = $this->pages->findOne("sku={$product_sku}");
         $product_title = $product_page->title;
         $product_price = $line_item["{$prfx}_purchase_price"];//This is an empty string
         $product_quantity = $line_item["{$prfx}_quantity"];
-        $product_detail_lis .=  "<li><span class='order-details__sku'>{$sku_uc}</span> {$product_title}</li>";
-        $quantity_lis .= "<li class='order-details__qty'>{$product_quantity}</li>";
+        $product_detail_lis .=  "<li><span class='order-details__sku'>$sku_uc</span> $product_title $pack_str</li>";
+        $quantity_lis .= "<li class='order-details__qty'>$product_quantity</li>";
         $total += $product_price * $product_quantity;
       }
 
