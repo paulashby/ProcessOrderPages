@@ -15,6 +15,7 @@ class ProcessOrderPages extends Process {
         "name" => "orders",
         "title" => "Orders",
       ],
+      "permission" => "order-page-view"
     ];
   }
 
