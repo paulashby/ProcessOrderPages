@@ -473,9 +473,9 @@ class ProcessOrderPages extends Process {
       <small class='buttons remove-bttn'><a href='./confirmdeletecompleted' class='ui-button ui-button--pop ui-button--remove ui-state-default '>Remove completed orders</a></small>";     
     }
     if($num_orders) {
-
+      /* Commented out for Paperbird
       $out .= "<small class='buttons remove-bttn'><a href='./confirm' class='ui-button ui-button--pop ui-button--remove ui-state-default '>Remove all order data</a></small>";
-
+      */
     } else {
 
       $out .= "<p>There are no live orders currently in the system</p>";
