@@ -102,7 +102,7 @@ class ProcessOrderPages extends Process {
         "fields" => array(
           "{$prfx}_customer" => array("fieldtype"=>"FieldtypeText", "label"=>"Customer", "config"=>array("html_ee")),
           "{$prfx}_sku_ref" => array("fieldtype"=>"FieldtypeText", "label"=>"Record of cart item sku", "config"=>array("html_ee")),
-          "{$prfx}_quantity" => array("fieldtype"=>"FieldtypeInteger", "label"=>"Number of packs"),
+          "{$prfx}_quantity" => array("fieldtype"=>"FieldtypeInteger", "label"=>"Number of units"),
           "{$prfx}_purchase_price" => array("fieldtype"=>"FieldtypeInteger", "label"=>"Price when ordered"),
           "{$prfx}_ecopack" => array("fieldtype"=>"FieldtypeInteger", "label"=>"Supply in eco pack")
         ),
@@ -438,7 +438,7 @@ class ProcessOrderPages extends Process {
     }
 
     $live_orders_pg = ! array_key_exists("completed", $orders);
-    $header_row_settings = ["Order Number", "Product", "Packs", "Total", "Customer"];
+    $header_row_settings = ["Order Number", "Product", "Units", "Total", "Customer"];
 
     if($live_orders_pg){
       $header_row_settings[] = "Status";
@@ -533,9 +533,22 @@ class ProcessOrderPages extends Process {
         $product_title = $product_page->title;
         $product_price = $line_item["{$prfx}_purchase_price"];//This is an empty string
         $product_quantity = $line_item["{$prfx}_quantity"];
-        $product_detail_lis .=  "<li><span class='order-details__sku'>$sku_uc</span> $product_title $pack_str</li>";
-        $quantity_lis .= "<li class='order-details__qty'>$product_quantity</li>";
         $total += $product_price * $product_quantity;
+        $product_detail_lis .=  "<li><span class='order-details__sku'>$sku_uc</span> $product_title $pack_str</li>";
+
+        if($product_page->hasField('price_category') && $product_page->price_category) {
+          $unit_increment = $product_page->price_category->paper->unit_increment;
+          if($unit_increment){
+            // When unit_increment is set, ensure quantity is a multiple of that value
+            if($product_quantity % $unit_increment === 0) {
+              $product_quantity = $product_quantity/$unit_increment;  
+            } else {
+              $product_quantity = "Quantity of $product_quantity is invalid";
+              $this->warning("Order number $order_number contains errors - this product is only available in units of $unit_increment");
+            }  
+          }
+        }
+        $quantity_lis .= "<li class='order-details__qty'>$product_quantity</li>";
       }
 
       // Order details
