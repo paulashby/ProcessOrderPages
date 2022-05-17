@@ -401,6 +401,30 @@ class ProcessOrderPages extends Process {
     }
   }
 /**
+ * Remove completed orders that are older than 1 month
+ *
+ * @return Boolean
+*/
+  protected function weeksToRetainOrders($num_weeks) {
+
+    $WEEK = 604800;
+    $cart = $this->modules->get("OrderCart");
+
+    foreach ($cart->getOrdersPage("completed")->children() as $user_orders) {
+
+      foreach ($user_orders as $user_order) {
+
+        // These are the individual order pages
+        $order_age = time() - $user_order->created;
+
+        if($order_age > $WEEK * $num_weeks) {
+          $user_order->delete(true);
+        }
+      }
+    }
+    return true;
+  }
+/**
  * Check for completed orders
  *
 * @return Boolean
@@ -459,7 +483,10 @@ class ProcessOrderPages extends Process {
 
     if($live_orders_pg) {
 
-      // Include link only if there are completed orders
+      // Remove record of old completed orders
+      $this->weeksToRetainOrders(4);
+
+      // Include link only if there are completed orders remaining
       if($this->completedExist()){
 
         $out .= "<small class='buttons completed-bttn'><a href='./completed' class='ui-button ui-button--completed ui-button--pop ui-state-default '>Completed Orders</a></small>";
