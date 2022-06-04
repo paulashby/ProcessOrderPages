@@ -61,7 +61,7 @@ class ProcessOrderPages extends Process {
 
     $class = $event->arguments(0);
     $page_path = $this->page->path();
-    if($class !== $this->className || $page_path !== "/processwire/module/") return;
+    if($class !== $this->className || $page_path !== wire("urls")->admin . "module/") return;
     
     // Config input
     $data = $event->arguments(1);
