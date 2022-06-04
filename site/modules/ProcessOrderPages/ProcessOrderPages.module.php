@@ -104,10 +104,11 @@ class ProcessOrderPages extends Process {
           "{$prfx}_sku_ref" => array("fieldtype"=>"FieldtypeText", "label"=>"Record of cart item sku", "config"=>array("html_ee")),
           "{$prfx}_quantity" => array("fieldtype"=>"FieldtypeInteger", "label"=>"Number of units"),
           "{$prfx}_purchase_price" => array("fieldtype"=>"FieldtypeInteger", "label"=>"Price when ordered"),
+          "{$prfx}_discount" => array("fieldtype"=>"FieldtypeInteger", "label"=>"Discount applicable at time of order"),
           "{$prfx}_ecopack" => array("fieldtype"=>"FieldtypeInteger", "label"=>"Supply in eco pack")
         ),
         "templates" => array(
-          "{$prfx}-line-item" => array("t_parents" => array("{$prfx}-cart-item", "{$prfx}-order"), "t_fields"=>array("{$prfx}_customer", "{$prfx}_sku_ref", "{$prfx}_quantity","{$prfx}_purchase_price", "{$prfx}_ecopack")),
+          "{$prfx}-line-item" => array("t_parents" => array("{$prfx}-cart-item", "{$prfx}-order"), "t_fields"=>array("{$prfx}_customer", "{$prfx}_sku_ref", "{$prfx}_quantity","{$prfx}_purchase_price", "{$prfx}_discount", "{$prfx}_ecopack")),
           "{$prfx}-cart-item" => array("t_parents" => array("{$prfx}-section"), "t_children" => array("{$prfx}-line-item")),
           "{$prfx}-order" => array("t_parents" => array("{$prfx}-user-orders"), "t_children" => array("{$prfx}-line-item")),
           "{$prfx}-user-orders" => array("t_parents" => array("{$prfx}-step"), "t_children" => array("{$prfx}-order")),
@@ -195,38 +196,45 @@ class ProcessOrderPages extends Process {
     $class = $event->arguments(0);
     if($class !== $this->className) return;
 
-    $page_maker = $this->modules->get("PageMaker");
-    $page_maker_config = $this->modules->getConfig("PageMaker"); 
-    $order_system_pages = $page_maker_config["page_sets"]["process_order_pages"]["setup"]["pages"];
+    $data = $event->arguments(1);
+    $configured = is_array($data) && array_key_exists("configured", $data);
 
-    // Check for live orders before uninstalling
-    if($this->inUse($order_system_pages)) { 
-      
-      // There are active orders - abort uninstall
-      $this->error("The module could not be uninstalled as live data exists. If you want to proceed, you can remove all order data from the Admin/Orders page and try again.");
-      $event->replace = true; // prevent uninstall
-      $this->session->redirect("./edit?name=$class"); 
+    if($configured) {
 
-    } else {
+      $page_maker = $this->modules->get("PageMaker");
+      $page_maker_config = $this->modules->getConfig("PageMaker"); 
+      $order_system_pages = $page_maker_config["page_sets"]["process_order_pages"]["setup"]["pages"];
 
-      // Safe to proceed - remove display_name field from user template
-      $prfx = $this["prfx"];
-      $f_name = "{$prfx}_display_name";
-      $rm_fld = wire("fields")->get($f_name);
-      if($rm_fld !== null) {
-        $ufg = wire("fieldgroups")->get("user");
-        $ufg->remove($rm_fld);
-        $ufg->save();
-        wire("fields")->delete($rm_fld);
+      // Check for live orders before uninstalling
+      if($this->inUse($order_system_pages)) { 
+        
+        // There are active orders - abort uninstall
+        $this->error("The module could not be uninstalled as live data exists. If you want to proceed, you can remove all order data from the Admin/Orders page and try again.");
+        $event->replace = true; // prevent uninstall
+        $this->session->redirect("./edit?name=$class"); 
+
+      } else {
+
+        // Safe to remove fields, templates and pages created by the module
+
+        // remove display_name field from user template
+        $prfx = $this["prfx"];
+        $f_name = "{$prfx}_display_name";
+        $rm_fld = wire("fields")->get($f_name);
+        if($rm_fld !== null) {
+          $ufg = wire("fieldgroups")->get("user");
+          $ufg->remove($rm_fld);
+          $ufg->save();
+          wire("fields")->delete($rm_fld);
+        }
+
+        /*
+        Remove the fields and templates of the five order system pages - the parent, "Order Pages", 
+        and "Cart Items", "Pending Orders", "Active Orders" and "Completed Orders".
+        Args are $recursive (remove children), $report_pg_errs false as pages as will already have been removed
+        */
+        $page_maker->removeSet("process_order_pages", false);
       }
-
-      /*
-      Remove the fields and templates of the five order system pages - the parent, "Order Pages", 
-      and "Cart Items", "Pending Orders", "Active Orders" and "Completed Orders".
-      Args are $recursive (remove children), $report_pg_errs false as pages as will already have been removed
-      */
-      $page_maker->removeSet("process_order_pages", false);
-
       // Remove the ajax template that was installed by init()
       $ajax_t = $this->templates->get("order-actions");
       if($ajax_t) {
@@ -500,7 +508,7 @@ class ProcessOrderPages extends Process {
       <small class='buttons remove-bttn'><a href='./confirmdeletecompleted' class='ui-button ui-button--pop ui-button--remove ui-state-default '>Remove completed orders</a></small>";     
     }
     if($num_orders) {
-      /* Commented out for Paperbird
+      /* Commented out for Paperbird 
       $out .= "<small class='buttons remove-bttn'><a href='./confirm' class='ui-button ui-button--pop ui-button--remove ui-state-default '>Remove all order data</a></small>";
       */
     } else {
