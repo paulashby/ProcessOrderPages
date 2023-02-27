@@ -12,7 +12,7 @@
   
   ## Installation
   
-  Firstly, download and install the latest version of [Processwire](https://processwire.com). Download the ProcessOrderPages folder and place in your /site/modules directory. You'll also need do the same with the [OrderCart](https://github.com/paulashby/OrderCart) and [PageMaker](https://github.com/paulashby/PageMaker) modules as these are required by ProcessOrderPages.<br /><br />Log into your site as an admin and go the Modules page. Select the Site tab and click the Install button on the ProcessOrderPages module entry.<br /><br />You can now configure the following:
+  Firstly, download and install the latest version of [Processwire](https://processwire.com). Download the ProcessOrderPages folder and place in your /site/modules directory. You'll also need do the same with the [OrderCart](https://github.com/paulashby/OrderCart) and [PageMaker](https://github.com/paulashby/PageMaker) modules as these are required by ProcessOrderPages. Please see the OrderCart repository for more information regarding settings.<br /><br />Log into your site as an admin and go the Modules page. Select the Site tab and click the Install button on the ProcessOrderPages module entry.<br /><br />You can now configure the following:
   - **Installation Root** - where on your system you want the module to create its page tree (this is where the module will generate parent pages for Cart Items, Pending Orders, Active Orders and Completed Orders).
   - **Order admin email** - the address you want to use to receive order notifications.
   - **Next order** - the order number you would like to start from. This will be incremented for each new order.
@@ -27,7 +27,7 @@
   
   ## Contributing
   
-  If you would like to make a contribution to the app, simply fork the respository and submit a Pull Request. If I like it, I may include it in the codebase.
+  If you would like to make a contribution to the app, simply fork the repository and submit a Pull Request. If I like it, I may include it in the codebase.
   
   ## Tests
   
